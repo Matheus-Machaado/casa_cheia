@@ -1,0 +1,14 @@
+---
+import Base from '~/layouts/Base.astro';
+import Catalog from '~/components/catalog/Catalog';
+import { getAllProducts } from '~/lib/products';
+import { getSettings } from '~/lib/settings';
+
+const products = getAllProducts();
+const settings = getSettings();
+---
+
+<Base title={`Presentes — chá da ${settings.bride_name}`} description="Lista de presentes do chá de casa nova da Lina">
+  <Catalog client:load products={products} />
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
+</Base>

@@ -1,0 +1,79 @@
+backend:
+  name: git-gateway
+  branch: main
+
+media_folder: public/uploads
+public_folder: /uploads
+
+publish_mode: simple
+
+collections:
+  - name: products
+    label: Presentes
+    label_singular: Presente
+    files:
+      - file: src/data/products.json
+        name: items
+        label: Lista de presentes
+        fields:
+          - label: Presentes
+            name: items
+            widget: list
+            allow_add: true
+            collapsed: true
+            summary: '{{fields.title}} — R$ {{fields.price_brl_cents}}c'
+            fields:
+              - { name: id, label: ID (slug), widget: string, pattern: ['^[a-z0-9-]+$', 'Use só letras minúsculas, números e hífen'] }
+              - { name: title, label: Título, widget: string }
+              - { name: price_brl_cents, label: Preço (centavos), widget: number, value_type: int, min: 0, required: false }
+              - { name: amazon_dp, label: Amazon DP, widget: string }
+              - { name: amazon_url, label: Link Amazon, widget: string, pattern: ['^https://www.amazon.com.br/', 'URL deve começar com https://www.amazon.com.br/'] }
+              - { name: image_url, label: Imagem URL, widget: string }
+              - { name: description, label: Descrição, widget: text, required: false }
+              - name: room
+                label: Cômodo
+                widget: select
+                options:
+                  - { label: Cozinha, value: cozinha }
+                  - { label: Eletro, value: eletro }
+                  - { label: Quarto, value: quarto }
+                  - { label: Banheiro, value: banheiro }
+                  - { label: Lavanderia, value: lavanderia }
+                  - { label: Sala, value: sala }
+                  - { label: Limpeza, value: limpeza }
+              - { name: qty_desejada, label: Quantos quero, widget: number, value_type: int, default: 1, min: 1 }
+              - { name: order, label: Ordem, widget: number, value_type: int, default: 0 }
+              - { name: active, label: Visível, widget: boolean, default: true }
+              - name: overlay_id
+                label: Overlay (animação)
+                widget: select
+                required: false
+                options:
+                  - { label: '— sem overlay —', value: '' }
+                  - { label: Panelas (cozinha stove), value: panelas-stove }
+                  - { label: Eletros bancada, value: eletros-bancada }
+                  - { label: Liquidificador, value: liquidificador }
+                  - { label: Cama quarto, value: cama-quarto }
+                  - { label: Sofá sala, value: sofa-sala }
+                  - { label: Mesa de jantar, value: mesa-jantar }
+                  - { label: Ventilador torre, value: ventilador-torre }
+                  - { label: Aspirador, value: aspirador }
+                  - { label: Banheiro set, value: banheiro-set }
+                  - { label: Ferro de passar, value: ferro-passar }
+                  - { label: Potes prateleira, value: potes-prateleira }
+                  - { label: Planta decor, value: planta-decor }
+
+  - name: settings
+    label: Configurações
+    files:
+      - file: src/data/settings.json
+        name: site
+        label: Configuração do site
+        fields:
+          - { name: bride_name, label: Nome da dona, widget: string }
+          - { name: event_date, label: Data do chá, widget: date }
+          - { name: event_time, label: Hora, widget: string }
+          - { name: event_address, label: Endereço, widget: string }
+          - { name: splash_title, label: Título do splash, widget: string }
+          - { name: splash_subtitle, label: Subtítulo, widget: text }
+          - { name: reminder_enabled, label: Lembrete ativo, widget: boolean }

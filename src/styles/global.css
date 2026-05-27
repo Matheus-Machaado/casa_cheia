@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ink:        #09090B;
+  --color-ink-2:      #27272A;
+  --color-ink-soft:   #52525B;
+  --color-ink-3:      #71717A;
+  --color-ink-4:      #A1A1AA;
+  --color-line:       #E4E4E7;
+  --color-line-2:     #F4F4F5;
+  --color-surface:    #FAFAFA;
+
+  --color-primary:    #F43F5E;
+  --color-primary-h:  #E11D48;
+  --color-primary-p:  #BE123C;
+  --color-primary-s:  #FFE4E6;
+  --color-primary-t:  #FFF1F2;
+
+  --color-accent:     #FACC15;
+  --color-accent-s:   #FEF9C3;
+
+  --color-success:    #10B981;
+  --color-success-s:  #D1FAE5;
+  --color-danger:     #EF4444;
+  --color-danger-s:   #FEE2E2;
+  --color-warn:       #F59E0B;
+  --color-warn-s:     #FEF3C7;
+
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+
+  --shadow-xs: 0 1px 2px rgba(9,9,11,0.05);
+  --shadow-sm: 0 1px 3px rgba(9,9,11,0.06), 0 1px 2px rgba(9,9,11,0.04);
+  --shadow-md: 0 4px 12px rgba(9,9,11,0.08);
+  --shadow-lg: 0 12px 32px rgba(9,9,11,0.10);
+  --shadow-pop: 0 18px 48px rgba(244,63,94,0.18);
+}
+
+html, body {
+  background: #FFFFFF;
+  color: #09090B;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: var(--font-display);
+}
+
+button, [role="button"], a[href] {
+  cursor: pointer;
+}
+button:disabled, [role="button"]:disabled, button[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { scrollbar-width: none; }
+
+.checker-bg {
+  background-image:
+    linear-gradient(45deg, #f4f4f5 25%, transparent 25%),
+    linear-gradient(-45deg, #f4f4f5 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f4f4f5 75%),
+    linear-gradient(-45deg, transparent 75%, #f4f4f5 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, 8px 0;
+}
+
+/* Top progress bar (global navigation loading) */
+.nprogress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #F43F5E;
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 200ms ease, opacity 200ms ease;
+  z-index: 100;
+  opacity: 0;
+}
+.nprogress-bar.active {
+  opacity: 1;
+  transform: scaleX(0.7);
+}
+.nprogress-bar.done {
+  transform: scaleX(1);
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

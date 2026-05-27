@@ -1,0 +1,22 @@
+project:
+  name: casacheia
+  stack: unknown
+branches:
+  development: dev
+  production: main
+commit_policy:
+  allowed_paths:
+    - "**/*"
+  forbidden_paths:
+    - .studio/**
+    - node_modules/**
+    - "*.log"
+    - .env
+    - .env.local
+promotion_policy:
+  require_human_approval: true
+  require_tag: true
+  tag_format: last-known-good-{missionId}
+push_policy:
+  require_human_approval: true
+  allowed_remotes: []
