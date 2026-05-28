@@ -16,7 +16,7 @@ const ROOM_ICONS: Record<string, string> = {
 export default function Catalog(props: Props) {
   const [filter, setFilter] = createSignal<'all' | Room>('all');
   const [search, setSearch] = createSignal('');
-  const [sort, setSort] = createSignal<'order' | 'title'>('order');
+  const [sort, setSort] = createSignal<'order' | 'price-asc' | 'price-desc' | 'title'>('order');
   const [availability, setAvailability] = createSignal<AvailabilitySnapshot | null>(null);
   const [selected, setSelected] = createSignal<Product | null>(null);
 
@@ -48,6 +48,8 @@ export default function Catalog(props: Props) {
       );
     }
     const s = sort();
+    if (s === 'price-asc') list.sort((a, b) => (a.price_brl_cents || 0) - (b.price_brl_cents || 0));
+    if (s === 'price-desc') list.sort((a, b) => (b.price_brl_cents || 0) - (a.price_brl_cents || 0));
     if (s === 'title') list.sort((a, b) => a.title.localeCompare(b.title));
     return list;
   });
@@ -87,6 +89,8 @@ export default function Catalog(props: Props) {
               class="hidden lg:block h-11 pl-3.5 pr-9 bg-line-2 border-0 rounded-xl text-sm cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary"
             >
               <option value="order">Ordem da Lina</option>
+              <option value="price-asc">Preço: menor → maior</option>
+              <option value="price-desc">Preço: maior → menor</option>
               <option value="title">A-Z</option>
             </select>
           </div>
@@ -158,10 +162,7 @@ export default function Catalog(props: Props) {
                     <div class="p-3 flex-1 flex flex-col gap-1.5">
                       <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">{p.room}</div>
                       <div class="text-sm font-semibold text-ink leading-snug line-clamp-2 flex-1">{p.title}</div>
-                      <div class="flex items-center gap-1 text-[11px] text-ink-3 font-medium mt-0.5">
-                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                        Ver preço na Amazon
-                      </div>
+                      <div class="text-base lg:text-lg font-bold text-ink">{formatBRL(p.price_brl_cents)}</div>
                     </div>
                   </button>
                 );
