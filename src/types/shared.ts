@@ -41,6 +41,15 @@ export interface Settings {
   bride_name: string;
   event_date: string;
   event_time: string;
+  // Endereço estruturado — composto via buildEventAddress(settings)
+  event_cep: string;          // só dígitos: "12345678"
+  event_street: string;
+  event_number: string;
+  event_complement: string;   // opcional ("" se vazio)
+  event_neighborhood: string;
+  event_city: string;
+  event_state: string;        // UF 2 chars
+  // Versão concatenada — derivada (não armazenada separadamente; computada).
   event_address: string;
   splash_title: string;
   splash_subtitle: string;

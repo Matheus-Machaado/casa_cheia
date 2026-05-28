@@ -10,7 +10,13 @@ interface DynamicSettings {
   bride_name: string;
   event_date: string;
   event_time: string;
-  event_address: string;
+  event_cep: string;
+  event_street: string;
+  event_number: string;
+  event_complement: string;
+  event_neighborhood: string;
+  event_city: string;
+  event_state: string;
   splash_title: string;
   splash_subtitle: string;
   reminder_message_template: string;
@@ -22,7 +28,13 @@ const DYNAMIC_DEFAULTS: DynamicSettings = {
   bride_name: settingsData.bride_name,
   event_date: settingsData.event_date,
   event_time: settingsData.event_time,
-  event_address: settingsData.event_address,
+  event_cep: settingsData.event_cep,
+  event_street: settingsData.event_street,
+  event_number: settingsData.event_number,
+  event_complement: settingsData.event_complement,
+  event_neighborhood: settingsData.event_neighborhood,
+  event_city: settingsData.event_city,
+  event_state: settingsData.event_state,
   splash_title: settingsData.splash_title,
   splash_subtitle: settingsData.splash_subtitle,
   reminder_message_template: MSG_DEFAULTS.reminder_message_template,
@@ -30,25 +42,49 @@ const DYNAMIC_DEFAULTS: DynamicSettings = {
   thankyou_post_message_template: MSG_DEFAULTS.thankyou_post_message_template,
 };
 
+/**
+ * Concatena os campos atômicos em uma string única "Rua, Nº — Complemento, Bairro, Cidade/UF".
+ * Pula segmentos vazios pra ficar elegante.
+ */
+function buildEventAddress(d: DynamicSettings): string {
+  const street = d.event_street?.trim();
+  const number = d.event_number?.trim();
+  const complement = d.event_complement?.trim();
+  const neighborhood = d.event_neighborhood?.trim();
+  const city = d.event_city?.trim();
+  const state = d.event_state?.trim();
+
+  const first = [street, number].filter(Boolean).join(', ');
+  const withComplement = complement ? `${first} — ${complement}` : first;
+  const cityState = [city, state].filter(Boolean).join('/');
+  const tail = [neighborhood, cityState].filter(Boolean).join(', ');
+  return [withComplement, tail].filter(Boolean).join(', ');
+}
+
 function mergeWithDefaults(dynamic: Partial<DynamicSettings>): Settings {
-  return {
+  const d: DynamicSettings = {
     bride_name: dynamic.bride_name ?? DYNAMIC_DEFAULTS.bride_name,
     event_date: dynamic.event_date ?? DYNAMIC_DEFAULTS.event_date,
     event_time: dynamic.event_time ?? DYNAMIC_DEFAULTS.event_time,
-    event_address: dynamic.event_address ?? DYNAMIC_DEFAULTS.event_address,
+    event_cep: dynamic.event_cep ?? DYNAMIC_DEFAULTS.event_cep,
+    event_street: dynamic.event_street ?? DYNAMIC_DEFAULTS.event_street,
+    event_number: dynamic.event_number ?? DYNAMIC_DEFAULTS.event_number,
+    event_complement: dynamic.event_complement ?? DYNAMIC_DEFAULTS.event_complement,
+    event_neighborhood: dynamic.event_neighborhood ?? DYNAMIC_DEFAULTS.event_neighborhood,
+    event_city: dynamic.event_city ?? DYNAMIC_DEFAULTS.event_city,
+    event_state: dynamic.event_state ?? DYNAMIC_DEFAULTS.event_state,
     splash_title: dynamic.splash_title ?? DYNAMIC_DEFAULTS.splash_title,
     splash_subtitle: dynamic.splash_subtitle ?? DYNAMIC_DEFAULTS.splash_subtitle,
     reminder_message_template: dynamic.reminder_message_template ?? DYNAMIC_DEFAULTS.reminder_message_template,
     thankyou_complete_message_template: dynamic.thankyou_complete_message_template ?? DYNAMIC_DEFAULTS.thankyou_complete_message_template,
     thankyou_post_message_template: dynamic.thankyou_post_message_template ?? DYNAMIC_DEFAULTS.thankyou_post_message_template,
   };
+  return {
+    ...d,
+    event_address: buildEventAddress(d),
+  };
 }
 
-/**
- * Síncrono. Retorna defaults do JSON estático (sem ler Blobs). Use só
- * em build-time / páginas pré-renderizadas que não precisam refletir
- * mudanças do painel admin.
- */
 export function getSettings(): Settings {
   return mergeWithDefaults({});
 }
@@ -70,10 +106,6 @@ async function writeDynamic(next: Partial<DynamicSettings>): Promise<void> {
   await store().setJSON(DYNAMIC_KEY, next);
 }
 
-/**
- * Async. Mescla defaults com overrides do Blobs. Use em handlers de
- * API e páginas SSR (prerender=false).
- */
 export async function getRuntimeSettings(): Promise<Settings> {
   const dynamic = await readDynamic();
   return mergeWithDefaults(dynamic);

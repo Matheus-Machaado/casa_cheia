@@ -1,6 +1,31 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
 import type { Settings } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
+import { applyCEPMask, parseCEPDigits, CEP_INPUT_MAX_LENGTH } from '~/lib/masks';
+import { toast } from './DialogHost';
+
+interface ViaCepResponse {
+  cep?: string;
+  logradouro?: string;
+  bairro?: string;
+  localidade?: string;
+  uf?: string;
+  erro?: boolean;
+}
+
+async function fetchCEP(cep: string): Promise<ViaCepResponse | null> {
+  const digits = parseCEPDigits(cep);
+  if (digits.length !== 8) return null;
+  try {
+    const res = await fetch(`https://viacep.com.br/ws/${digits}/json/`);
+    if (!res.ok) return null;
+    const data = await res.json() as ViaCepResponse;
+    if (data.erro) return null;
+    return data;
+  } catch {
+    return null;
+  }
+}
 
 const PLACEHOLDER_DOCS: Array<{ key: string; example: string }> = [
   { key: '{nome}', example: 'Primeiro nome do convidado (ex: Ana)' },
@@ -158,18 +183,144 @@ export default function AdminSettings() {
                   </div>
                 </div>
 
-                <div>
-                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Endereço</label>
-                  <input
-                    type="text"
-                    maxLength={200}
-                    value={s().event_address}
-                    onInput={(e) => update('event_address', e.currentTarget.value)}
-                    onBlur={() => save({ event_address: s().event_address })}
-                    disabled={saving()}
-                    placeholder="Av. Tal, 123 — apto 42, Cidade/UF"
-                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
-                  />
+                <div class="space-y-3 p-3 rounded-xl bg-line-2/50 border border-line">
+                  <div class="text-[11px] uppercase tracking-wider text-ink-3 font-bold">Endereço</div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">CEP</label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={CEP_INPUT_MAX_LENGTH}
+                        value={applyCEPMask(s().event_cep)}
+                        placeholder="12345-678"
+                        onInput={(e) => {
+                          const masked = applyCEPMask(e.currentTarget.value);
+                          e.currentTarget.value = masked;
+                          const digits = parseCEPDigits(masked);
+                          update('event_cep', digits);
+                        }}
+                        onBlur={async (e) => {
+                          const digits = parseCEPDigits(e.currentTarget.value);
+                          if (digits.length === 8 && digits !== s().event_cep) {
+                            const found = await fetchCEP(digits);
+                            if (found) {
+                              const patch: Partial<Settings> = {
+                                event_cep: digits,
+                                event_street: found.logradouro || s().event_street,
+                                event_neighborhood: found.bairro || s().event_neighborhood,
+                                event_city: found.localidade || s().event_city,
+                                event_state: (found.uf || s().event_state).toUpperCase(),
+                              };
+                              setSettings({ ...s(), ...patch });
+                              save(patch);
+                              toast('Endereço preenchido pelo CEP', 'ok', 2000);
+                            } else {
+                              toast('CEP não encontrado — preenche o resto manualmente', 'warn', 3000);
+                              save({ event_cep: digits });
+                            }
+                          } else if (digits.length === 8) {
+                            save({ event_cep: digits });
+                          }
+                        }}
+                        disabled={saving()}
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                      <p class="text-[10px] text-ink-3 mt-1">Digita o CEP e os campos preenchem sozinhos.</p>
+                    </div>
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">Rua / Avenida</label>
+                      <input
+                        type="text"
+                        maxLength={120}
+                        value={s().event_street}
+                        onInput={(e) => update('event_street', e.currentTarget.value)}
+                        onBlur={() => save({ event_street: s().event_street })}
+                        disabled={saving()}
+                        placeholder="Av. Brasil"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  <div class="grid grid-cols-2 gap-3">
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">Número</label>
+                      <input
+                        type="text"
+                        maxLength={20}
+                        value={s().event_number}
+                        onInput={(e) => update('event_number', e.currentTarget.value)}
+                        onBlur={() => save({ event_number: s().event_number })}
+                        disabled={saving()}
+                        placeholder="123"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">Complemento</label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={s().event_complement}
+                        onInput={(e) => update('event_complement', e.currentTarget.value)}
+                        onBlur={() => save({ event_complement: s().event_complement })}
+                        disabled={saving()}
+                        placeholder="apto 42 / bloco B"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">Bairro</label>
+                    <input
+                      type="text"
+                      maxLength={80}
+                      value={s().event_neighborhood}
+                      onInput={(e) => update('event_neighborhood', e.currentTarget.value)}
+                      onBlur={() => save({ event_neighborhood: s().event_neighborhood })}
+                      disabled={saving()}
+                      placeholder="Centro"
+                      class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                    />
+                  </div>
+
+                  <div class="grid grid-cols-[1fr_auto] gap-3">
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">Cidade</label>
+                      <input
+                        type="text"
+                        maxLength={80}
+                        value={s().event_city}
+                        onInput={(e) => update('event_city', e.currentTarget.value)}
+                        onBlur={() => save({ event_city: s().event_city })}
+                        disabled={saving()}
+                        placeholder="São Paulo"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                    </div>
+                    <div>
+                      <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-semibold mb-1.5">UF</label>
+                      <input
+                        type="text"
+                        maxLength={2}
+                        value={s().event_state}
+                        onInput={(e) => update('event_state', e.currentTarget.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2))}
+                        onBlur={() => save({ event_state: s().event_state })}
+                        disabled={saving()}
+                        placeholder="SP"
+                        class="w-20 h-11 px-3.5 bg-white border-0 rounded-xl text-sm font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      />
+                    </div>
+                  </div>
+
+                  <Show when={s().event_address}>
+                    <div class="text-[11px] text-ink-3 pt-1 border-t border-line">
+                      <span class="font-semibold">Endereço completo:</span> {s().event_address}
+                    </div>
+                  </Show>
                 </div>
 
                 <div>

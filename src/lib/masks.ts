@@ -51,3 +51,22 @@ export function parseBRLToCents(raw: string): number | null {
 }
 
 export const PRICE_BRL_INPUT_MAX_LENGTH = 12; // "999.999,99" + folga
+
+/**
+ * Máscara CEP: 12345-678 (8 dígitos).
+ */
+export function applyCEPMask(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
+export function parseCEPDigits(raw: string): string {
+  return raw.replace(/\D/g, '').slice(0, 8);
+}
+
+export function isValidCEP(raw: string): boolean {
+  return parseCEPDigits(raw).length === 8;
+}
+
+export const CEP_INPUT_MAX_LENGTH = 9; // "12345-678"
