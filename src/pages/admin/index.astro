@@ -1,9 +1,11 @@
 ---
+export const prerender = false;
+
 import Base from '~/layouts/Base.astro';
 import AdminPanel from '~/components/admin/AdminPanel';
-import { getAllProducts } from '~/lib/products';
+import { getRuntimeProducts } from '~/lib/products';
 
-const products = getAllProducts();
+const products = await getRuntimeProducts();
 ---
 
 <Base title="Painel · Casa Cheia" noindex fullscreen>

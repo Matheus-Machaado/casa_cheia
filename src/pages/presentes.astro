@@ -1,11 +1,15 @@
 ---
+export const prerender = false;
+
 import Base from '~/layouts/Base.astro';
 import Catalog from '~/components/catalog/Catalog';
-import { getAllProducts } from '~/lib/products';
+import { getRuntimeProducts } from '~/lib/products';
 import { getSettings } from '~/lib/settings';
 
-const products = getAllProducts();
+const products = await getRuntimeProducts();
 const settings = getSettings();
+
+Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
 ---
 
 <Base title={`Presentes — chá da ${settings.bride_name}`} description="Lista de presentes do chá de casa nova da Lina">

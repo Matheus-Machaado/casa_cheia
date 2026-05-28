@@ -35,7 +35,21 @@ export default function Catalog(props: Props) {
     loadAvailability();
     const handler = () => loadAvailability();
     window.addEventListener('casacheia:reservation-created', handler);
-    return () => window.removeEventListener('casacheia:reservation-created', handler);
+    // Polling: a Lina pode editar/cancelar pelo painel; o catálogo
+    // público reflete em até 30s sem F5.
+    const interval = setInterval(loadAvailability, 30000);
+    return () => {
+      window.removeEventListener('casacheia:reservation-created', handler);
+      clearInterval(interval);
+    };
+  });
+
+  const progressInfo = createMemo(() => {
+    const av = availability();
+    if (!av) {
+      return { pct: 0, confirmed: 0, desired: props.products.reduce((a, b) => a + b.qty_desejada, 0) };
+    }
+    return { pct: av.total_progress_pct, confirmed: av.total_confirmed, desired: av.total_desired };
   });
 
   const filtered = createMemo(() => {
@@ -59,10 +73,30 @@ export default function Catalog(props: Props) {
       {/* Header */}
       <div class="bg-white border-b border-line pt-6 pb-5">
         <div class="max-w-7xl mx-auto px-5 lg:px-8">
-          <div class="text-[11px] uppercase tracking-widest text-primary-h font-bold mb-1.5">lista de presentes</div>
-          <h1 class="text-2xl lg:text-4xl font-bold text-ink tracking-tight leading-tight">
-            {props.products.length} presentinhos.<br class="lg:hidden" /> <span class="font-display italic font-medium text-primary">Um apê inteiro.</span>
-          </h1>
+          <div class="flex items-end justify-between gap-4 mb-4">
+            <div>
+              <div class="text-[11px] uppercase tracking-widest text-primary-h font-bold mb-1.5">lista de presentes</div>
+              <h1 class="text-2xl lg:text-4xl font-bold text-ink tracking-tight leading-tight">
+                {props.products.length} presentinhos.<br class="lg:hidden" /> <span class="font-display italic font-medium text-primary">Um apê inteiro.</span>
+              </h1>
+            </div>
+            <div class="hidden lg:block text-right">
+              <div class="text-3xl font-bold text-ink">
+                {progressInfo().confirmed}<span class="text-ink-3 text-xl font-medium">/{progressInfo().desired}</span>
+              </div>
+              <div class="text-xs uppercase tracking-wider text-ink-3 mt-1 font-semibold">reservados</div>
+            </div>
+          </div>
+          <div class="bg-line-2 rounded-full h-2 overflow-hidden">
+            <div
+              class="bg-primary h-full rounded-full transition-all duration-700"
+              style={{ width: `${progressInfo().pct}%` }}
+            />
+          </div>
+          <div class="mt-2 flex items-center justify-between text-xs">
+            <span class="text-ink-3">{progressInfo().pct}% completo</span>
+            <span class="lg:hidden text-ink font-semibold">{progressInfo().confirmed} de {progressInfo().desired}</span>
+          </div>
         </div>
       </div>
 

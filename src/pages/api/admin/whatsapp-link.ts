@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json, errorResponse } from '~/lib/api';
 import { getReservation, updateReservation } from '~/lib/blobs';
-import { getProductById } from '~/lib/products';
+import { getRuntimeProductById } from '~/lib/products';
 import { getRuntimeSettings } from '~/lib/settings';
 import { buildVars, renderTemplate, templateForKind } from '~/lib/messages';
 import { MessageKindSchema } from '~/lib/validation';
@@ -31,7 +31,7 @@ export const POST: APIRoute = async ({ request }) => {
   if (!r) return errorResponse('NOT_FOUND', 'Reserva não encontrada', 404);
   if (!r.guest_phone) return errorResponse('BAD_REQUEST', 'Convidado não tem telefone', 400);
 
-  const p = getProductById(r.product_id);
+  const p = await getRuntimeProductById(r.product_id);
   if (!p) return errorResponse('NOT_FOUND', 'Produto não encontrado', 404);
 
   const s = await getRuntimeSettings();

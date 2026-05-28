@@ -1,14 +1,14 @@
 import type { APIRoute } from 'astro';
 import { json } from '~/lib/api';
 import { getAllCounters } from '~/lib/blobs';
-import { getAllProducts } from '~/lib/products';
+import { getRuntimeProducts } from '~/lib/products';
 import type { AvailabilitySnapshot, ProductAvailability } from '~/types/shared';
 
 export const prerender = false;
 
 export const GET: APIRoute = async () => {
   const counters = await getAllCounters();
-  const allProducts = getAllProducts();
+  const allProducts = await getRuntimeProducts();
 
   const products: Record<string, ProductAvailability> = {};
   let totalConfirmed = 0;

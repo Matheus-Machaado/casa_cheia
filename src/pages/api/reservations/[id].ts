@@ -2,7 +2,7 @@ import type { APIRoute } from 'astro';
 import { json, errorResponse } from '~/lib/api';
 import { ReservationActionSchema } from '~/lib/validation';
 import { getReservation, updateReservation, updateProductCounter, getProductCounter } from '~/lib/blobs';
-import { getProductById } from '~/lib/products';
+import { getRuntimeProductById } from '~/lib/products';
 import { getRuntimeSettings } from '~/lib/settings';
 import { sendCancellationToAdmin } from '~/lib/email';
 import { requireAdminUser } from '~/lib/serverAuth';
@@ -27,7 +27,7 @@ export const PATCH: APIRoute = async ({ params, request }) => {
   const reservation = await getReservation(id);
   if (!reservation) return errorResponse('NOT_FOUND', 'Reserva não encontrada', 404);
 
-  const product = getProductById(reservation.product_id);
+  const product = await getRuntimeProductById(reservation.product_id);
   if (!product) return errorResponse('NOT_FOUND', 'Produto associado não encontrado', 404);
 
   const previousStatus = reservation.status;

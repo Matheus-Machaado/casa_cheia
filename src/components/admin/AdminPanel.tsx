@@ -2,6 +2,7 @@ import { createSignal, Show, onMount } from 'solid-js';
 import type { Product } from '~/types/shared';
 import AdminReservations from './AdminReservations';
 import AdminSettings from './AdminSettings';
+import AdminProducts from './AdminProducts';
 import DialogHost from './DialogHost';
 import { currentUser, logout } from '~/lib/auth';
 
@@ -9,7 +10,7 @@ interface Props {
   products: Product[];
 }
 
-type Tab = 'reservas' | 'configuracoes';
+type Tab = 'reservas' | 'produtos' | 'configuracoes';
 
 export default function AdminPanel(props: Props) {
   const [tab, setTab] = createSignal<Tab>('reservas');
@@ -37,6 +38,16 @@ export default function AdminPanel(props: Props) {
             >
               Reservas
               <Show when={tab() === 'reservas'}>
+                <span class="absolute left-0 right-0 bottom-0 h-0.5 bg-primary" />
+              </Show>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTab('produtos')}
+              class={`px-3 lg:px-4 h-full text-sm font-semibold relative cursor-pointer ${tab() === 'produtos' ? 'text-ink' : 'text-ink-3 hover:text-ink'}`}
+            >
+              Produtos
+              <Show when={tab() === 'produtos'}>
                 <span class="absolute left-0 right-0 bottom-0 h-0.5 bg-primary" />
               </Show>
             </button>
@@ -74,6 +85,9 @@ export default function AdminPanel(props: Props) {
 
       <Show when={tab() === 'reservas'}>
         <AdminReservations products={props.products} />
+      </Show>
+      <Show when={tab() === 'produtos'}>
+        <AdminProducts />
       </Show>
       <Show when={tab() === 'configuracoes'}>
         <AdminSettings />

@@ -1,7 +1,7 @@
 import type { APIRoute } from 'astro';
 import { json, errorResponse, readClientIp } from '~/lib/api';
 import { ReservationCreateSchema } from '~/lib/validation';
-import { getProductById } from '~/lib/products';
+import { getRuntimeProductById } from '~/lib/products';
 import { getRuntimeSettings } from '~/lib/settings';
 import {
   putReservation,
@@ -44,7 +44,7 @@ export const POST: APIRoute = async ({ request }) => {
     });
   }
 
-  const product = getProductById(input.product_id);
+  const product = await getRuntimeProductById(input.product_id);
   if (!product) {
     return errorResponse('NOT_FOUND', 'Presente não encontrado', 404);
   }
