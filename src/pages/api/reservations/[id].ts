@@ -5,11 +5,12 @@ import { getReservation, updateReservation, updateProductCounter, getProductCoun
 import { getProductById } from '~/lib/products';
 import { getRuntimeSettings } from '~/lib/settings';
 import { sendCancellationToAdmin } from '~/lib/email';
+import { requireAdminUser } from '~/lib/serverAuth';
 
 export const prerender = false;
 
-export const PATCH: APIRoute = async ({ params, request, locals }) => {
-  const user = (locals as { netlify?: { context?: { clientContext?: { user?: { email: string } } } } }).netlify?.context?.clientContext?.user;
+export const PATCH: APIRoute = async ({ params, request }) => {
+  const user = await requireAdminUser(request);
   if (!user) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
 
   const id = params.id;

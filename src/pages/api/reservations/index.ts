@@ -13,6 +13,7 @@ import {
 } from '~/lib/blobs';
 import { sendAdminNotification } from '~/lib/email';
 import { hashIp } from '~/lib/identity';
+import { requireAdminUser } from '~/lib/serverAuth';
 import type { Reservation, CreateReservationResponse } from '~/types/shared';
 
 export const prerender = false;
@@ -110,9 +111,8 @@ export const POST: APIRoute = async ({ request }) => {
   return json({ data: response }, 201, { 'Cache-Control': 'no-store' });
 };
 
-export const GET: APIRoute = async ({ request, locals }) => {
-  const user = (locals as { netlify?: { context?: { clientContext?: { user?: { email: string; app_metadata?: { roles?: string[] } } } } } }).netlify?.context?.clientContext?.user;
-  if (!user) {
+export const GET: APIRoute = async ({ request }) => {
+  if (!(await requireAdminUser(request))) {
     return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
   }
 

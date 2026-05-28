@@ -2,21 +2,18 @@ import type { APIRoute } from 'astro';
 import { json, errorResponse } from '~/lib/api';
 import { SettingsUpdateSchema } from '~/lib/validation';
 import { getRuntimeSettings, updateRuntimeSettings } from '~/lib/settings';
+import { requireAdminUser } from '~/lib/serverAuth';
 
 export const prerender = false;
 
-function requireUser(locals: unknown) {
-  return (locals as { netlify?: { context?: { clientContext?: { user?: { email: string } } } } }).netlify?.context?.clientContext?.user;
-}
-
-export const GET: APIRoute = async ({ locals }) => {
-  if (!requireUser(locals)) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
+export const GET: APIRoute = async ({ request }) => {
+  if (!(await requireAdminUser(request))) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
   const settings = await getRuntimeSettings();
   return json({ data: { settings } }, 200, { 'Cache-Control': 'no-store, private' });
 };
 
-export const PATCH: APIRoute = async ({ request, locals }) => {
-  if (!requireUser(locals)) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
+export const PATCH: APIRoute = async ({ request }) => {
+  if (!(await requireAdminUser(request))) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
 
   let payload: unknown;
   try {

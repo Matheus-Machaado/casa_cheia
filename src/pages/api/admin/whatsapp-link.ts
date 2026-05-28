@@ -5,6 +5,7 @@ import { getProductById } from '~/lib/products';
 import { getRuntimeSettings } from '~/lib/settings';
 import { buildVars, renderTemplate, templateForKind } from '~/lib/messages';
 import { MessageKindSchema } from '~/lib/validation';
+import { requireAdminUser } from '~/lib/serverAuth';
 import type { WhatsAppLinkResponse, ActivityLogEntry, MessageKind } from '~/types/shared';
 import { unformatPhone } from '~/lib/format';
 
@@ -15,9 +16,8 @@ interface RequestBody {
   kind?: MessageKind;
 }
 
-export const POST: APIRoute = async ({ request, locals }) => {
-  const user = (locals as { netlify?: { context?: { clientContext?: { user?: { email: string } } } } }).netlify?.context?.clientContext?.user;
-  if (!user) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
+export const POST: APIRoute = async ({ request }) => {
+  if (!(await requireAdminUser(request))) return errorResponse('UNAUTHORIZED', 'Login admin necessário', 401);
 
   let body: RequestBody;
   try { body = await request.json(); } catch { return errorResponse('BAD_REQUEST', 'JSON inválido', 400); }
