@@ -1,4 +1,4 @@
-import { createSignal, createMemo, Show, onMount, onCleanup } from 'solid-js';
+import { createSignal, createMemo, createEffect, Show, onMount, onCleanup } from 'solid-js';
 import type { Product, ProductAvailability } from '~/types/shared';
 import { formatBRL, formatPhoneBR, isValidPhoneBR } from '~/lib/format';
 
@@ -9,22 +9,64 @@ interface Props {
   onClose: () => void;
 }
 
+const ASIN_REGEX = /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i;
+
+function extractAsin(p: Product): string | null {
+  if (p.amazon_dp && /^[A-Z0-9]{10}$/i.test(p.amazon_dp)) return p.amazon_dp;
+  const m = p.amazon_url.match(ASIN_REGEX);
+  return m ? m[1] : null;
+}
+
+/**
+ * Monta link da Amazon já com a quantidade correta. Usa o endpoint de
+ * add-to-cart oficial (ASIN.1 + Quantity.1) quando dá pra extrair o
+ * ASIN; senão volta pro link normal do produto.
+ */
+function buildAmazonUrl(p: Product, qty: number): string {
+  if (qty <= 1) return p.amazon_url;
+  const asin = extractAsin(p);
+  if (!asin) return p.amazon_url;
+  return `https://www.amazon.com.br/gp/aws/cart/add.html?ASIN.1=${asin}&Quantity.1=${qty}`;
+}
+
 export default function ProductModal(props: Props) {
   const [name, setName] = createSignal('');
   const [phone, setPhone] = createSignal('');
+  const [qty, setQty] = createSignal(1);
   const [submitting, setSubmitting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
   const available = () => props.availability?.available ?? props.product.qty_desejada;
   const isSoldOut = () => available() <= 0;
+  const hasQtyChoice = () => available() > 1;
+
+  // Default: pega todos os disponíveis. Reage a mudanças de availability
+  // (ex: outra reserva chega via polling) sem reset se já passou da
+  // primeira renderização.
+  createEffect(() => {
+    const av = available();
+    if (av > 0) setQty((prev) => Math.min(Math.max(prev, av), av));
+  });
 
   const canSubmit = createMemo(() => {
     if (submitting()) return false;
     if (isSoldOut()) return false;
+    if (qty() < 1 || qty() > available()) return false;
     if (name().trim().length < 2) return false;
     // Phone é opcional, mas se preenchido precisa ser válido
     if (phone().trim() && !isValidPhoneBR(phone())) return false;
     return true;
+  });
+
+  function clampQty(n: number): number {
+    if (!isFinite(n)) return 1;
+    return Math.max(1, Math.min(available(), Math.round(n)));
+  }
+
+  const lineTotal = createMemo(() => {
+    const cents = props.product.price_brl_cents;
+    if (cents === null) return null;
+    return cents * qty();
   });
 
   let mouseDownOnBackdrop = false;
@@ -54,12 +96,13 @@ export default function ProductModal(props: Props) {
     setSubmitting(true);
     setError(null);
     try {
+      const finalQty = clampQty(qty());
       const res = await fetch('/api/reservations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           product_id: props.product.id,
-          qty: 1,
+          qty: finalQty,
           guest_name: name().trim(),
           guest_phone: phone().trim() || null,
           hp_url: '',
@@ -72,8 +115,8 @@ export default function ProductModal(props: Props) {
         return;
       }
       window.dispatchEvent(new CustomEvent('casacheia:reservation-created'));
-      // Redirect direto pra Amazon — fluxo termina aqui.
-      window.location.assign(props.product.amazon_url);
+      // Redirect direto pra Amazon (carrinho c/ quantidade pré-selecionada).
+      window.location.assign(buildAmazonUrl(props.product, finalQty));
     } catch (e) {
       setError((e as Error).message);
       setSubmitting(false);
@@ -120,8 +163,11 @@ export default function ProductModal(props: Props) {
           {/* Info */}
           <div>
             <h2 class="text-xl lg:text-2xl font-bold text-ink tracking-tight leading-snug">{props.product.title}</h2>
-            <div class="mt-2 flex items-baseline gap-2">
+            <div class="mt-2 flex items-baseline gap-2 flex-wrap">
               <span class="text-2xl font-bold text-ink">{formatBRL(props.product.price_brl_cents)}</span>
+              <Show when={props.product.qty_desejada > 1}>
+                <span class="text-xs text-ink-3">por unidade</span>
+              </Show>
             </div>
             <p class="mt-3 text-sm text-ink-soft leading-relaxed">{props.product.description}</p>
           </div>
@@ -141,6 +187,47 @@ export default function ProductModal(props: Props) {
           >
             <form onSubmit={submit} class="flex flex-col gap-3">
               <input type="text" hidden name="hp_url" value="" />
+
+              <Show when={hasQtyChoice()}>
+                <div class="rounded-xl bg-line-2 p-3 flex items-center gap-3">
+                  <div class="flex-1 min-w-0">
+                    <div class="text-[11px] uppercase tracking-wider text-ink-3 font-bold">Quantos vai levar?</div>
+                    <div class="text-[11px] text-ink-3 mt-0.5">
+                      A Lina quer {props.product.qty_desejada} no total.
+                      <Show when={available() < props.product.qty_desejada}>
+                        <span> Disponíveis agora: <strong>{available()}</strong>.</span>
+                      </Show>
+                    </div>
+                  </div>
+                  <div class="flex items-center bg-white rounded-lg overflow-hidden h-10 focus-within:ring-2 focus-within:ring-primary shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setQty(clampQty(qty() - 1))}
+                      disabled={qty() <= 1}
+                      class="h-10 w-10 grid place-items-center text-ink-soft hover:text-ink hover:bg-line-2 transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      aria-label="Diminuir"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <div class="w-10 h-10 grid place-items-center text-base font-bold text-ink select-none">{qty()}</div>
+                    <button
+                      type="button"
+                      onClick={() => setQty(clampQty(qty() + 1))}
+                      disabled={qty() >= available()}
+                      class="h-10 w-10 grid place-items-center text-ink-soft hover:text-ink hover:bg-line-2 transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+                      aria-label="Aumentar"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                  </div>
+                </div>
+                <Show when={lineTotal() !== null && qty() > 1}>
+                  <div class="-mt-1 flex items-center justify-end gap-2 text-xs text-ink-3">
+                    <span>{qty()}× {formatBRL(props.product.price_brl_cents)} =</span>
+                    <strong class="text-ink text-sm">{formatBRL(lineTotal())}</strong>
+                  </div>
+                </Show>
+              </Show>
 
               <div>
                 <label for="guest_name" class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Seu nome</label>
@@ -183,7 +270,7 @@ export default function ProductModal(props: Props) {
                 disabled={!canSubmit()}
                 class="h-12 mt-1 rounded-xl bg-primary hover:bg-primary-h active:bg-primary-p text-white font-semibold transition flex items-center justify-center gap-2 shadow-pop disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
-                {submitting() ? 'Reservando…' : 'Confirmar e abrir Amazon'}
+                {submitting() ? 'Reservando…' : (qty() > 1 ? `Confirmar ${qty()} e abrir Amazon` : 'Confirmar e abrir Amazon')}
                 <Show when={!submitting()}>
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </Show>
