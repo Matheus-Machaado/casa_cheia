@@ -1,6 +1,6 @@
 ---
 import '~/styles/global.css';
-import { getSettings, formatEventDateShort } from '~/lib/settings';
+import { getRuntimeSettings, formatEventDateShort } from '~/lib/settings';
 
 interface Props {
   title: string;
@@ -10,9 +10,10 @@ interface Props {
 }
 
 const { title, description, noindex, fullscreen } = Astro.props;
-const settings = getSettings();
+const settings = await getRuntimeSettings();
 const eventDateShort = formatEventDateShort(settings.event_date);
 const defaultDesc = `${settings.splash_subtitle}`;
+const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(settings.event_address)}`;
 ---
 
 <!doctype html>
@@ -74,11 +75,18 @@ const defaultDesc = `${settings.splash_subtitle}`;
 
     {!fullscreen && (
       <footer class="bg-white border-t border-line py-8 mt-12">
-        <div class="max-w-7xl mx-auto px-5 lg:px-8 flex flex-col lg:flex-row items-center justify-between gap-3">
+        <div class="max-w-7xl mx-auto px-5 lg:px-8 flex flex-col lg:flex-row items-center justify-between gap-3 text-center lg:text-left">
           <div class="flex items-center gap-2 text-sm text-ink-3">
             <span class="font-semibold text-ink">Casa Cheia</span> · feito com carinho pra {settings.bride_name}
           </div>
-          <div class="text-xs text-ink-3">{eventDateShort} {settings.event_date.slice(0, 4)} · {settings.event_time} · {settings.event_address}</div>
+          <div class="text-xs text-ink-3 flex flex-wrap items-center justify-center gap-1.5">
+            <span>{eventDateShort} {settings.event_date.slice(0, 4)} · {settings.event_time}</span>
+            <span class="hidden sm:inline">·</span>
+            <a href={mapsUrl} target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-1 hover:text-primary-h transition underline-offset-4 hover:underline">
+              {settings.event_address}
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </a>
+          </div>
         </div>
       </footer>
     )}

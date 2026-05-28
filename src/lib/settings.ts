@@ -7,25 +7,37 @@ const SETTINGS_STORE = 'settings';
 const DYNAMIC_KEY = 'runtime.json';
 
 interface DynamicSettings {
+  bride_name: string;
+  event_date: string;
+  event_time: string;
+  event_address: string;
+  splash_title: string;
+  splash_subtitle: string;
   reminder_message_template: string;
   thankyou_complete_message_template: string;
   thankyou_post_message_template: string;
 }
 
 const DYNAMIC_DEFAULTS: DynamicSettings = {
+  bride_name: settingsData.bride_name,
+  event_date: settingsData.event_date,
+  event_time: settingsData.event_time,
+  event_address: settingsData.event_address,
+  splash_title: settingsData.splash_title,
+  splash_subtitle: settingsData.splash_subtitle,
   reminder_message_template: MSG_DEFAULTS.reminder_message_template,
   thankyou_complete_message_template: MSG_DEFAULTS.thankyou_complete_message_template,
   thankyou_post_message_template: MSG_DEFAULTS.thankyou_post_message_template,
 };
 
-function mergeWithDefaults(base: typeof settingsData, dynamic: Partial<DynamicSettings>): Settings {
+function mergeWithDefaults(dynamic: Partial<DynamicSettings>): Settings {
   return {
-    bride_name: base.bride_name,
-    event_date: base.event_date,
-    event_time: base.event_time,
-    event_address: base.event_address,
-    splash_title: base.splash_title,
-    splash_subtitle: base.splash_subtitle,
+    bride_name: dynamic.bride_name ?? DYNAMIC_DEFAULTS.bride_name,
+    event_date: dynamic.event_date ?? DYNAMIC_DEFAULTS.event_date,
+    event_time: dynamic.event_time ?? DYNAMIC_DEFAULTS.event_time,
+    event_address: dynamic.event_address ?? DYNAMIC_DEFAULTS.event_address,
+    splash_title: dynamic.splash_title ?? DYNAMIC_DEFAULTS.splash_title,
+    splash_subtitle: dynamic.splash_subtitle ?? DYNAMIC_DEFAULTS.splash_subtitle,
     reminder_message_template: dynamic.reminder_message_template ?? DYNAMIC_DEFAULTS.reminder_message_template,
     thankyou_complete_message_template: dynamic.thankyou_complete_message_template ?? DYNAMIC_DEFAULTS.thankyou_complete_message_template,
     thankyou_post_message_template: dynamic.thankyou_post_message_template ?? DYNAMIC_DEFAULTS.thankyou_post_message_template,
@@ -33,12 +45,12 @@ function mergeWithDefaults(base: typeof settingsData, dynamic: Partial<DynamicSe
 }
 
 /**
- * Síncrono. Usado em páginas estáticas (build-time) e templates Astro.
- * Não enxerga overrides do Blobs — mostra defaults. Para handlers/functions,
- * use {@link getRuntimeSettings}.
+ * Síncrono. Retorna defaults do JSON estático (sem ler Blobs). Use só
+ * em build-time / páginas pré-renderizadas que não precisam refletir
+ * mudanças do painel admin.
  */
 export function getSettings(): Settings {
-  return mergeWithDefaults(settingsData, {});
+  return mergeWithDefaults({});
 }
 
 function store() {
@@ -59,11 +71,12 @@ async function writeDynamic(next: Partial<DynamicSettings>): Promise<void> {
 }
 
 /**
- * Async. Usado em handlers de API. Mescla JSON estático com overrides do Blobs.
+ * Async. Mescla defaults com overrides do Blobs. Use em handlers de
+ * API e páginas SSR (prerender=false).
  */
 export async function getRuntimeSettings(): Promise<Settings> {
   const dynamic = await readDynamic();
-  return mergeWithDefaults(settingsData, dynamic);
+  return mergeWithDefaults(dynamic);
 }
 
 export async function updateRuntimeSettings(patch: Partial<DynamicSettings>): Promise<Settings> {
@@ -75,7 +88,7 @@ export async function updateRuntimeSettings(patch: Partial<DynamicSettings>): Pr
     (next as Record<string, unknown>)[k] = v;
   }
   await writeDynamic(next);
-  return mergeWithDefaults(settingsData, next);
+  return mergeWithDefaults(next);
 }
 
 export function formatEventDate(iso: string): string {

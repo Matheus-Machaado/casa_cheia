@@ -111,6 +111,97 @@ export default function AdminSettings() {
       <Show when={settings()}>
         {(s) => (
           <>
+            <section class="bg-white border border-line rounded-2xl p-5 lg:p-6">
+              <h2 class="text-lg font-bold text-ink tracking-tight">Dados do chá</h2>
+              <p class="text-sm text-ink-soft mt-0.5 mb-4">Aparecem na home, nas mensagens e no convite. Atualizam o site em até 30s depois do save.</p>
+
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Nome da homenageada</label>
+                  <input
+                    type="text"
+                    maxLength={80}
+                    value={s().bride_name}
+                    onInput={(e) => update('bride_name', e.currentTarget.value)}
+                    onBlur={() => save({ bride_name: s().bride_name })}
+                    disabled={saving()}
+                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                  />
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Data</label>
+                    <input
+                      type="date"
+                      value={s().event_date}
+                      onChange={(e) => {
+                        const v = e.currentTarget.value;
+                        if (v) save({ event_date: v });
+                      }}
+                      disabled={saving()}
+                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                    />
+                  </div>
+                  <div>
+                    <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Horário</label>
+                    <input
+                      type="time"
+                      value={s().event_time}
+                      onChange={(e) => {
+                        const v = e.currentTarget.value;
+                        if (v) save({ event_time: v });
+                      }}
+                      disabled={saving()}
+                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Endereço</label>
+                  <input
+                    type="text"
+                    maxLength={200}
+                    value={s().event_address}
+                    onInput={(e) => update('event_address', e.currentTarget.value)}
+                    onBlur={() => save({ event_address: s().event_address })}
+                    disabled={saving()}
+                    placeholder="Av. Tal, 123 — apto 42, Cidade/UF"
+                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Título da capa</label>
+                  <input
+                    type="text"
+                    maxLength={120}
+                    value={s().splash_title}
+                    onInput={(e) => update('splash_title', e.currentTarget.value)}
+                    onBlur={() => save({ splash_title: s().splash_title })}
+                    disabled={saving()}
+                    placeholder="Ajude a Lina a deixar o apê cheinho."
+                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                  />
+                </div>
+
+                <div>
+                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Subtítulo da capa</label>
+                  <textarea
+                    rows={2}
+                    maxLength={240}
+                    value={s().splash_subtitle}
+                    onInput={(e) => update('splash_subtitle', e.currentTarget.value)}
+                    onBlur={() => save({ splash_subtitle: s().splash_subtitle })}
+                    disabled={saving()}
+                    placeholder="Escolhe um presentinho lá embaixo. A cada item, a casa fica mais cheia — e a Lina mais feliz."
+                    class="w-full px-3.5 py-2.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60 resize-none"
+                  />
+                </div>
+              </div>
+            </section>
+
             <div class="bg-white border border-line rounded-2xl p-5 lg:p-6">
               <h2 class="text-lg font-bold text-ink tracking-tight mb-1">Templates das mensagens</h2>
               <p class="text-sm text-ink-soft">Você dispara cada uma manualmente — a plataforma só monta a mensagem prontinha com o nome do convidado e abre o WhatsApp pra você dar enviar.</p>

@@ -13,6 +13,12 @@ export const ReservationActionSchema = z.object({
 });
 
 export const SettingsUpdateSchema = z.object({
+  bride_name: z.string().trim().min(1).max(80).optional(),
+  event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data inválida (YYYY-MM-DD)' }).optional(),
+  event_time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Hora inválida (HH:MM)' }).optional(),
+  event_address: z.string().trim().min(3).max(200).optional(),
+  splash_title: z.string().trim().min(3).max(120).optional(),
+  splash_subtitle: z.string().trim().min(3).max(240).optional(),
   reminder_message_template: z.string().trim().min(10).max(1000).optional(),
   thankyou_complete_message_template: z.string().trim().min(10).max(1000).optional(),
   thankyou_post_message_template: z.string().trim().min(10).max(1000).optional(),
