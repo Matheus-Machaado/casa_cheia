@@ -289,7 +289,7 @@ export default function AdminReservations(props: Props) {
                       <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-0.5">{dateStr}</div>
                       <div class="font-semibold text-ink text-sm truncate">{r.guest_name}</div>
                       <div class="text-xs text-ink-soft truncate">{r.qty}× {p?.title ?? r.product_id}</div>
-                      <div class="text-[11px] text-ink-3 mt-0.5 truncate">{r.guest_phone}{r.guest_email ? ` · ${r.guest_email}` : ''}</div>
+                      <div class="text-[11px] text-ink-3 mt-0.5 truncate">{r.guest_phone || 'sem telefone'}</div>
                     </div>
                   </div>
                   <Show when={r.message}>

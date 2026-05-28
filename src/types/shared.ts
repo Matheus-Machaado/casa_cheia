@@ -59,7 +59,7 @@ export interface Reservation {
   product_id: string;
   guest_name: string;
   guest_email: string | null;
-  guest_phone: string;
+  guest_phone: string | null;
   qty: number;
   message: string | null;
   status: ReservationStatus;
@@ -101,8 +101,6 @@ export interface CreateReservationBody {
   product_id: string;
   qty: number;
   guest_name: string;
-  guest_phone: string;
-  message?: string | null;
   hp_url: string;
 }
 
