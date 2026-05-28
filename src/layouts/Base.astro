@@ -32,6 +32,17 @@ const defaultDesc = `${settings.splash_subtitle}`;
     <meta property="og:description" content={description || defaultDesc} />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/og-image.png" />
+    <script is:inline>
+      // Hash de convite/recovery/confirmation do Netlify Identity cai por
+      // default na raiz do site (template padrão do GoTrue aponta pro
+      // SiteURL). Redireciona pra /conta/ mantendo o token no hash.
+      (function () {
+        var h = location.hash || '';
+        if (/(invite_token|recovery_token|confirmation_token|error)=/.test(h) && !/^\/conta\/?$/.test(location.pathname)) {
+          location.replace('/conta/' + h);
+        }
+      })();
+    </script>
   </head>
   <body class={fullscreen ? 'is-fullscreen' : ''}>
     <div id="nprogress" class="nprogress-bar"></div>
