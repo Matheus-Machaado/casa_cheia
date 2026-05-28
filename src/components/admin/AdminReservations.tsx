@@ -1,6 +1,6 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import type { Reservation, Product, MessageKind } from '~/types/shared';
-import { authFetch } from '~/lib/auth';
+import { authFetch, isLoggedIn } from '~/lib/auth';
 
 interface Props {
   products: Product[];
@@ -26,6 +26,7 @@ export default function AdminReservations(props: Props) {
   const isComplete = createMemo(() => totalDesired() > 0 && totalConfirmed() >= totalDesired());
 
   async function loadConfirmedSnapshot() {
+    if (!isLoggedIn()) return;
     try {
       const res = await authFetch('/api/reservations?status=confirmada');
       if (res.ok) {
@@ -36,14 +37,11 @@ export default function AdminReservations(props: Props) {
   }
 
   async function load() {
+    if (!isLoggedIn()) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
       const res = await authFetch(`/api/reservations?status=${tab()}`);
-      if (res.status === 401) {
-        setError('Sessão expirou. Recarrega a página e faz login de novo.');
-        return;
-      }
       const body = await res.json() as { data: Reservation[]; error?: { message: string } };
       if (!res.ok) {
         setError(body.error?.message ?? 'Erro ao carregar');
@@ -52,7 +50,8 @@ export default function AdminReservations(props: Props) {
       setReservations(body.data);
       if (tab() === 'confirmada') setAllConfirmed(body.data);
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      if (msg !== 'session-expired') setError(msg);
     } finally {
       setLoading(false);
     }

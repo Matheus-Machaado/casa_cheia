@@ -327,10 +327,12 @@ const products = getAllProducts();
     submitBtn.textContent = 'Entrando…';
     try {
       await login(emailInput.value.trim(), pwInput.value);
-      show('app');
+      // Reload pra que AdminPanel monte com sessão fresca e seus onMount
+      // façam fetch autenticado. Sem reload, ele já estaria mounted desde
+      // o bootScreen sem token válido e não tem listener pra re-fetchar.
+      window.location.reload();
     } catch (ex) {
       showError((ex as Error).message || 'Não foi possível entrar.');
-    } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = 'Entrar';
     }
@@ -365,4 +367,9 @@ const products = getAllProducts();
   } else {
     show('login');
   }
+
+  // Sessão expirou em algum fetch admin → volta pro login sem reload.
+  window.addEventListener('casacheia:session-expired', () => {
+    show('login');
+  });
 </script>

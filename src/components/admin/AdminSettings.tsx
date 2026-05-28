@@ -1,6 +1,6 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
 import type { Settings } from '~/types/shared';
-import { authFetch } from '~/lib/auth';
+import { authFetch, isLoggedIn } from '~/lib/auth';
 
 const PLACEHOLDER_DOCS: Array<{ key: string; example: string }> = [
   { key: '{nome}', example: 'Primeiro nome do convidado (ex: Ana)' },
@@ -42,14 +42,11 @@ export default function AdminSettings() {
   const [success, setSuccess] = createSignal<string | null>(null);
 
   async function load() {
+    if (!isLoggedIn()) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
       const res = await authFetch('/api/admin/settings');
-      if (res.status === 401) {
-        setError('Sessão expirou. Recarrega a página e faz login de novo.');
-        return;
-      }
       const body = (await res.json()) as { data?: { settings: Settings }; error?: { message: string } };
       if (!res.ok || !body.data) {
         setError(body.error?.message ?? 'Erro ao carregar');
@@ -57,7 +54,8 @@ export default function AdminSettings() {
       }
       setSettings(body.data.settings);
     } catch (e) {
-      setError((e as Error).message);
+      const msg = (e as Error).message;
+      if (msg !== 'session-expired') setError(msg);
     } finally {
       setLoading(false);
     }

@@ -232,24 +232,30 @@ export async function verifyRecovery(token: string, password: string): Promise<S
 }
 
 /**
- * Wrapper de fetch que injeta `Authorization: Bearer <token>` e lida com
- * 401 (sessão expirou → logout + reload). Use em todos os fetches do
- * painel admin.
+ * Wrapper de fetch que injeta `Authorization: Bearer <token>`. Em 401,
+ * limpa a sessão local e dispara o evento `casacheia:session-expired`
+ * pro orquestrador do /admin tratar (sem reload — evita loop quando o
+ * componente monta antes do gate decidir).
+ *
+ * Lança `Error('session-expired')` em vez de recarregar; componentes
+ * devem checar `isLoggedIn()` antes de chamar.
  */
 export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
   let token: string;
   try {
     token = await getAccessToken();
   } catch {
-    if (typeof window !== 'undefined') window.location.reload();
     throw new Error('session-expired');
   }
   const headers = new Headers(init.headers || {});
   headers.set('Authorization', 'Bearer ' + token);
   const res = await fetch(input, { ...init, headers });
-  if (res.status === 401 && typeof window !== 'undefined') {
+  if (res.status === 401) {
     logout();
-    window.location.reload();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('casacheia:session-expired'));
+    }
+    throw new Error('session-expired');
   }
   return res;
 }
