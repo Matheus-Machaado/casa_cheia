@@ -44,15 +44,12 @@ export interface Settings {
   event_address: string;
   splash_title: string;
   splash_subtitle: string;
-  reminder_enabled: boolean;
-  reminder_hours_before: number;
   reminder_message_template: string;
-  thankyou_enabled: boolean;
-  thankyou_message_template: string;
-  thankyou_sent: boolean;
-  thankyou_sent_at: string | null;
-  whatsapp_enabled: boolean;
+  thankyou_complete_message_template: string;
+  thankyou_post_message_template: string;
 }
+
+export type MessageKind = 'reminder' | 'thankyou-complete' | 'thankyou-post';
 
 export type ReservationStatus = 'confirmada' | 'cancelada';
 
@@ -70,8 +67,6 @@ export interface Reservation {
   cancelled_at: string | null;
   cancelled_by: string | null;
   cancellation_reason: string | null;
-  reminder_sent_at: string | null;
-  thankyou_sent_at: string | null;
   activity_log: ActivityLogEntry[];
   ip_hash: string;
   user_agent_hash: string;
@@ -81,8 +76,7 @@ export type ActivityChannel = 'email' | 'whatsapp';
 export type ActivityType =
   | 'admin-notification'
   | 'cancellation'
-  | 'reminder'
-  | 'thankyou';
+  | 'whatsapp-link-generated';
 
 export interface ActivityLogEntry {
   channel: ActivityChannel;
@@ -91,6 +85,7 @@ export interface ActivityLogEntry {
   to: string;
   provider_message_id: string | null;
   error: string | null;
+  kind?: MessageKind;
 }
 
 export type ReservationPublic = Omit<Reservation, '_v' | 'ip_hash' | 'user_agent_hash'>;

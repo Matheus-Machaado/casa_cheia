@@ -20,19 +20,12 @@ export const ReservationActionSchema = z.object({
 });
 
 export const SettingsUpdateSchema = z.object({
-  bride_name: z.string().trim().min(1).max(80).optional(),
-  event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data deve ser YYYY-MM-DD' }).optional(),
-  event_time: z.string().regex(/^\d{2}:\d{2}$/, { message: 'Hora deve ser HH:MM' }).optional(),
-  event_address: z.string().trim().max(200).optional(),
-  splash_title: z.string().trim().max(120).optional(),
-  splash_subtitle: z.string().trim().max(240).optional(),
-  reminder_enabled: z.boolean().optional(),
-  reminder_hours_before: z.number().int().min(1).max(720).optional(),
   reminder_message_template: z.string().trim().min(10).max(1000).optional(),
-  thankyou_enabled: z.boolean().optional(),
-  thankyou_message_template: z.string().trim().min(10).max(1000).optional(),
-  whatsapp_enabled: z.boolean().optional(),
+  thankyou_complete_message_template: z.string().trim().min(10).max(1000).optional(),
+  thankyou_post_message_template: z.string().trim().min(10).max(1000).optional(),
 });
+
+export const MessageKindSchema = z.enum(['reminder', 'thankyou-complete', 'thankyou-post']);
 
 export type ReservationCreateInput = z.infer<typeof ReservationCreateSchema>;
 export type ReservationActionInput = z.infer<typeof ReservationActionSchema>;

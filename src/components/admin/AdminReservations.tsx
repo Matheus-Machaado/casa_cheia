@@ -1,6 +1,5 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
-import type { Reservation, Product } from '~/types/shared';
-import { formatBRL } from '~/lib/format';
+import type { Reservation, Product, MessageKind } from '~/types/shared';
 
 interface Props {
   products: Product[];
@@ -9,14 +8,31 @@ interface Props {
 export default function AdminReservations(props: Props) {
   const [tab, setTab] = createSignal<'confirmada' | 'cancelada'>('confirmada');
   const [reservations, setReservations] = createSignal<Reservation[]>([]);
+  const [allConfirmed, setAllConfirmed] = createSignal<Reservation[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
+  const [bulk, setBulk] = createSignal<{ kind: MessageKind; pending: Reservation[]; current: Reservation | null; total: number } | null>(null);
+  const [bulkPreview, setBulkPreview] = createSignal<{ url: string; message: string } | null>(null);
 
   const productMap = createMemo(() => {
     const m = new Map<string, Product>();
     for (const p of props.products) m.set(p.id, p);
     return m;
   });
+
+  const totalDesired = createMemo(() => props.products.reduce((a, p) => a + p.qty_desejada, 0));
+  const totalConfirmed = createMemo(() => allConfirmed().reduce((a, r) => a + r.qty, 0));
+  const isComplete = createMemo(() => totalDesired() > 0 && totalConfirmed() >= totalDesired());
+
+  async function loadConfirmedSnapshot() {
+    try {
+      const res = await fetch('/api/reservations?status=confirmada', { credentials: 'include' });
+      if (res.ok) {
+        const body = await res.json() as { data: Reservation[] };
+        setAllConfirmed(body.data);
+      }
+    } catch {/* ignore */}
+  }
 
   async function load() {
     setLoading(true);
@@ -33,6 +49,7 @@ export default function AdminReservations(props: Props) {
         return;
       }
       setReservations(body.data);
+      if (tab() === 'confirmada') setAllConfirmed(body.data);
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -40,7 +57,10 @@ export default function AdminReservations(props: Props) {
     }
   }
 
-  onMount(load);
+  onMount(() => {
+    load();
+    loadConfirmedSnapshot();
+  });
 
   const stats = createMemo(() => {
     const all = reservations();
@@ -60,6 +80,7 @@ export default function AdminReservations(props: Props) {
     });
     if (res.ok) {
       load();
+      loadConfirmedSnapshot();
     } else {
       const body = await res.json() as { error?: { message: string } };
       alert(body.error?.message ?? 'Erro ao cancelar');
@@ -75,45 +96,94 @@ export default function AdminReservations(props: Props) {
     });
     if (res.ok) {
       load();
+      loadConfirmedSnapshot();
     } else {
       const body = await res.json() as { error?: { message: string } };
       alert(body.error?.message ?? 'Erro ao restaurar');
     }
   }
 
-  async function openWhatsApp(id: string) {
+  async function fetchLink(id: string, kind: MessageKind): Promise<{ url: string; message: string } | null> {
     const res = await fetch('/api/admin/whatsapp-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ reservation_id: id }),
+      body: JSON.stringify({ reservation_id: id, kind }),
     });
-    const body = await res.json() as { data?: { url: string }; error?: { message: string } };
-    if (res.ok && body.data) {
-      window.open(body.data.url, '_blank');
-    } else {
-      alert(body.error?.message ?? 'Erro ao gerar link');
-    }
+    const body = await res.json() as { data?: { url: string; message: string }; error?: { message: string } };
+    if (res.ok && body.data) return body.data;
+    alert(body.error?.message ?? 'Erro ao gerar link');
+    return null;
   }
+
+  async function openLink(id: string, kind: MessageKind) {
+    const data = await fetchLink(id, kind);
+    if (data) window.open(data.url, '_blank');
+  }
+
+  function startBulk(kind: MessageKind) {
+    const list = allConfirmed().filter((r) => r.guest_phone);
+    if (list.length === 0) {
+      alert('Nenhuma reserva confirmada com telefone.');
+      return;
+    }
+    setBulk({ kind, pending: list, current: list[0], total: list.length });
+    void primeBulkPreview(list[0], kind);
+  }
+
+  async function primeBulkPreview(r: Reservation, kind: MessageKind) {
+    const data = await fetchLink(r.id, kind);
+    setBulkPreview(data);
+  }
+
+  function bulkSendCurrentAndNext() {
+    const b = bulk();
+    const preview = bulkPreview();
+    if (!b || !b.current || !preview) return;
+    window.open(preview.url, '_blank');
+    const remaining = b.pending.slice(1);
+    if (remaining.length === 0) {
+      setBulk(null);
+      setBulkPreview(null);
+      return;
+    }
+    const next = remaining[0];
+    setBulk({ ...b, pending: remaining, current: next });
+    setBulkPreview(null);
+    void primeBulkPreview(next, b.kind);
+  }
+
+  function bulkSkipCurrent() {
+    const b = bulk();
+    if (!b) return;
+    const remaining = b.pending.slice(1);
+    if (remaining.length === 0) {
+      setBulk(null);
+      setBulkPreview(null);
+      return;
+    }
+    const next = remaining[0];
+    setBulk({ ...b, pending: remaining, current: next });
+    setBulkPreview(null);
+    void primeBulkPreview(next, b.kind);
+  }
+
+  function bulkCancel() {
+    setBulk(null);
+    setBulkPreview(null);
+  }
+
+  const kindLabels: Record<MessageKind, string> = {
+    'reminder': 'Lembrete pré-chá',
+    'thankyou-complete': 'Agradecimento (lista completa)',
+    'thankyou-post': 'Agradecimento (pós-chá)',
+  };
 
   return (
     <div>
       <div class="bg-white border-b border-line">
         <div class="max-w-7xl mx-auto px-5 lg:px-8 py-5 lg:py-7">
-          <div class="flex items-start justify-between gap-4 mb-5">
-            <div>
-              <div class="text-[11px] uppercase tracking-widest text-primary-h font-bold mb-1.5">painel admin</div>
-              <h1 class="text-2xl lg:text-3xl font-bold text-ink tracking-tight">Painel da <span class="font-display italic font-medium text-primary">Lina</span></h1>
-            </div>
-            <div class="hidden lg:flex items-center gap-2">
-              <a href="/" class="h-10 px-4 rounded-xl bg-line-2 hover:bg-line text-sm font-semibold text-ink transition flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                Ver site público
-              </a>
-            </div>
-          </div>
-
-          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+          <div class="grid grid-cols-2 lg:grid-cols-4 gap-2.5 mb-4">
             <div class="bg-line-2 rounded-xl p-3.5">
               <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">confirmadas</div>
               <div class="text-2xl lg:text-3xl font-bold text-ink">{stats().confirmed}</div>
@@ -123,14 +193,32 @@ export default function AdminReservations(props: Props) {
               <div class="text-2xl lg:text-3xl font-bold text-ink-soft">{stats().cancelled}</div>
             </div>
             <div class="bg-line-2 rounded-xl p-3.5">
-              <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">presentes</div>
-              <div class="text-2xl lg:text-3xl font-bold text-ink">{props.products.length}</div>
+              <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">progresso</div>
+              <div class="text-2xl lg:text-3xl font-bold text-ink">{totalDesired() > 0 ? Math.round((totalConfirmed() / totalDesired()) * 100) : 0}%</div>
             </div>
             <div class="bg-line-2 rounded-xl p-3.5">
               <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">atualizar</div>
-              <button type="button" onClick={load} class="text-sm font-semibold text-primary-h hover:text-primary-p flex items-center gap-1">
+              <button type="button" onClick={() => { load(); loadConfirmedSnapshot(); }} class="text-sm font-semibold text-primary-h hover:text-primary-p flex items-center gap-1 cursor-pointer">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 Refresh
+              </button>
+            </div>
+          </div>
+
+          <div class="bg-line-2 rounded-xl p-3 flex flex-col lg:flex-row lg:items-center gap-2.5">
+            <div class="flex-1 min-w-0">
+              <div class="text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-0.5">disparo personalizado</div>
+              <div class="text-xs text-ink-soft">Abre o WhatsApp da Lina com mensagem prontinha por convidado — só dar enviar.</div>
+            </div>
+            <div class="flex flex-wrap gap-1.5">
+              <button type="button" onClick={() => startBulk('reminder')} disabled={allConfirmed().length === 0} class="h-9 px-3 rounded-lg bg-white border border-line hover:border-ink text-xs font-semibold text-ink transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                Lembrar todos
+              </button>
+              <button type="button" onClick={() => startBulk('thankyou-complete')} disabled={!isComplete()} class="h-9 px-3 rounded-lg bg-white border border-line hover:border-ink text-xs font-semibold text-ink transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed" title={isComplete() ? '' : 'Habilita quando 100% comprado'}>
+                Agradecer (lista completa)
+              </button>
+              <button type="button" onClick={() => startBulk('thankyou-post')} disabled={allConfirmed().length === 0} class="h-9 px-3 rounded-lg bg-white border border-line hover:border-ink text-xs font-semibold text-ink transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
+                Agradecer (pós-chá)
               </button>
             </div>
           </div>
@@ -142,14 +230,14 @@ export default function AdminReservations(props: Props) {
           <button
             type="button"
             onClick={() => { setTab('confirmada'); load(); }}
-            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px ${tab() === 'confirmada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
+            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer ${tab() === 'confirmada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
           >
             Confirmadas
           </button>
           <button
             type="button"
             onClick={() => { setTab('cancelada'); load(); }}
-            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px ${tab() === 'cancelada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
+            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer ${tab() === 'cancelada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
           >
             Canceladas
           </button>
@@ -193,23 +281,29 @@ export default function AdminReservations(props: Props) {
                   <Show when={r.message}>
                     <div class="hidden lg:block max-w-[200px] text-xs italic text-ink-soft border-l-2 border-line pl-3">"{r.message}"</div>
                   </Show>
-                  <div class="flex items-center gap-1.5 lg:gap-2">
+                  <div class="flex flex-wrap items-center gap-1.5">
                     <Show when={r.status === 'confirmada' && r.guest_phone}>
-                      <button type="button" onClick={() => openWhatsApp(r.id)} class="h-9 px-3 rounded-lg bg-line-2 hover:bg-line text-xs font-semibold text-ink transition flex items-center gap-1.5">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                        WhatsApp
+                      <button type="button" onClick={() => openLink(r.id, 'reminder')} title="Lembrete pré-chá" class="h-9 px-3 rounded-lg bg-line-2 hover:bg-line text-xs font-semibold text-ink transition flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Lembrar
+                      </button>
+                      <button type="button" onClick={() => openLink(r.id, 'thankyou-complete')} disabled={!isComplete()} title={isComplete() ? 'Agradecimento (lista completa)' : 'Habilita quando 100% comprado'} class="h-9 px-3 rounded-lg bg-line-2 hover:bg-line text-xs font-semibold text-ink transition flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-line-2">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+                        Comemorar
+                      </button>
+                      <button type="button" onClick={() => openLink(r.id, 'thankyou-post')} title="Agradecimento (pós-chá)" class="h-9 px-3 rounded-lg bg-line-2 hover:bg-line text-xs font-semibold text-ink transition flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        Pós-chá
                       </button>
                     </Show>
                     <Show when={r.status === 'confirmada'}>
-                      <button type="button" onClick={() => cancel(r.id)} class="h-9 px-3 rounded-lg bg-line-2 hover:bg-danger-s text-xs font-semibold text-ink-soft hover:text-danger transition flex items-center gap-1.5">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                        Cancelar
+                      <button type="button" onClick={() => cancel(r.id)} title="Cancelar reserva" class="h-9 px-3 rounded-lg bg-line-2 hover:bg-danger-s text-xs font-semibold text-ink-soft hover:text-danger transition flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                       </button>
                     </Show>
                     <Show when={r.status === 'cancelada'}>
-                      <button type="button" onClick={() => restore(r.id)} class="h-9 px-3 rounded-lg bg-line-2 hover:bg-success-s text-xs font-semibold text-ink-soft hover:text-success transition flex items-center gap-1.5">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
-                        Restaurar
+                      <button type="button" onClick={() => restore(r.id)} title="Restaurar reserva" class="h-9 px-3 rounded-lg bg-line-2 hover:bg-success-s text-xs font-semibold text-ink-soft hover:text-success transition flex items-center gap-1.5 cursor-pointer">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                       </button>
                     </Show>
                   </div>
@@ -219,6 +313,58 @@ export default function AdminReservations(props: Props) {
           </For>
         </div>
       </div>
+
+      <Show when={bulk()}>
+        {(b) => (
+          <div class="fixed inset-0 z-50 grid place-items-center p-4 bg-black/60">
+            <div class="bg-white rounded-2xl max-w-md w-full p-5 lg:p-6">
+              <div class="flex items-start justify-between gap-4 mb-4">
+                <div>
+                  <div class="text-[11px] uppercase tracking-widest text-primary-h font-bold mb-1">{kindLabels[b().kind]}</div>
+                  <h3 class="text-lg font-bold text-ink tracking-tight">Disparar pra {b().total} convidado{b().total === 1 ? '' : 's'}</h3>
+                </div>
+                <button type="button" onClick={bulkCancel} class="text-ink-3 hover:text-ink cursor-pointer" aria-label="Fechar">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+
+              <Show when={b().current}>
+                {(curr) => (
+                  <div class="space-y-3">
+                    <div class="bg-line-2 rounded-xl p-3">
+                      <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">próximo</div>
+                      <div class="font-semibold text-ink text-sm">{curr().guest_name} · {curr().guest_phone}</div>
+                      <div class="text-xs text-ink-soft">{curr().qty}× {productMap().get(curr().product_id)?.title ?? curr().product_id}</div>
+                    </div>
+
+                    <Show when={bulkPreview()} fallback={<div class="text-center py-4 text-ink-3 text-xs">Carregando preview…</div>}>
+                      {(prev) => (
+                        <div class="bg-line-2 rounded-xl p-3 max-h-48 overflow-y-auto">
+                          <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">mensagem</div>
+                          <pre class="text-xs text-ink whitespace-pre-wrap font-sans leading-relaxed">{prev().message}</pre>
+                        </div>
+                      )}
+                    </Show>
+
+                    <div class="flex items-center gap-2 pt-2">
+                      <button type="button" onClick={bulkSkipCurrent} class="flex-1 h-10 rounded-xl bg-line-2 hover:bg-line text-sm font-semibold text-ink-soft transition cursor-pointer">
+                        Pular
+                      </button>
+                      <button type="button" onClick={bulkSendCurrentAndNext} disabled={!bulkPreview()} class="flex-[2] h-10 rounded-xl bg-primary hover:bg-primary-h text-white text-sm font-semibold transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed">
+                        Abrir no WhatsApp →
+                      </button>
+                    </div>
+
+                    <div class="text-center text-[11px] text-ink-3">
+                      restam {b().pending.length} de {b().total}
+                    </div>
+                  </div>
+                )}
+              </Show>
+            </div>
+          </div>
+        )}
+      </Show>
     </div>
   );
 }
