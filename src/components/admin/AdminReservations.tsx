@@ -9,8 +9,7 @@ interface Props {
 
 export default function AdminReservations(props: Props) {
   const [tab, setTab] = createSignal<'confirmada' | 'cancelada'>('confirmada');
-  const [reservations, setReservations] = createSignal<Reservation[]>([]);
-  const [allConfirmed, setAllConfirmed] = createSignal<Reservation[]>([]);
+  const [allReservations, setAllReservations] = createSignal<Reservation[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
   const [bulk, setBulk] = createSignal<{ kind: MessageKind; pending: Reservation[]; current: Reservation | null; total: number } | null>(null);
@@ -22,34 +21,28 @@ export default function AdminReservations(props: Props) {
     return m;
   });
 
+  // Fonte única: lista todas as reservas (confirmadas + canceladas).
+  // As métricas do topo e a lista filtrada por aba derivam disto.
+  const reservations = createMemo(() => allReservations().filter((r) => r.status === tab()));
+  const allConfirmed = createMemo(() => allReservations().filter((r) => r.status === 'confirmada'));
+  const allCancelled = createMemo(() => allReservations().filter((r) => r.status === 'cancelada'));
+
   const totalDesired = createMemo(() => props.products.reduce((a, p) => a + p.qty_desejada, 0));
   const totalConfirmed = createMemo(() => allConfirmed().reduce((a, r) => a + r.qty, 0));
   const isComplete = createMemo(() => totalDesired() > 0 && totalConfirmed() >= totalDesired());
-
-  async function loadConfirmedSnapshot() {
-    if (!isLoggedIn()) return;
-    try {
-      const res = await authFetch('/api/reservations?status=confirmada');
-      if (res.ok) {
-        const body = await res.json() as { data: Reservation[] };
-        setAllConfirmed(body.data);
-      }
-    } catch {/* ignore */}
-  }
 
   async function load() {
     if (!isLoggedIn()) { setLoading(false); return; }
     setLoading(true);
     setError(null);
     try {
-      const res = await authFetch(`/api/reservations?status=${tab()}`);
+      const res = await authFetch('/api/reservations?status=all');
       const body = await res.json() as { data: Reservation[]; error?: { message: string } };
       if (!res.ok) {
         setError(body.error?.message ?? 'Erro ao carregar');
         return;
       }
-      setReservations(body.data);
-      if (tab() === 'confirmada') setAllConfirmed(body.data);
+      setAllReservations(body.data);
     } catch (e) {
       const msg = (e as Error).message;
       if (msg !== 'session-expired') setError(msg);
@@ -58,17 +51,12 @@ export default function AdminReservations(props: Props) {
     }
   }
 
-  onMount(() => {
-    load();
-    loadConfirmedSnapshot();
-  });
+  onMount(load);
 
-  const stats = createMemo(() => {
-    const all = reservations();
-    const confirmed = all.filter((r) => r.status === 'confirmada').length;
-    const cancelled = all.filter((r) => r.status === 'cancelada').length;
-    return { confirmed, cancelled };
-  });
+  const stats = createMemo(() => ({
+    confirmed: allConfirmed().length,
+    cancelled: allCancelled().length,
+  }));
 
   async function cancel(id: string) {
     const ok = await confirmDialog({
@@ -94,7 +82,6 @@ export default function AdminReservations(props: Props) {
     });
     if (res.ok) {
       load();
-      loadConfirmedSnapshot();
       toast('Reserva cancelada', 'ok');
     } else {
       const body = await res.json() as { error?: { message: string } };
@@ -110,7 +97,6 @@ export default function AdminReservations(props: Props) {
     });
     if (res.ok) {
       load();
-      loadConfirmedSnapshot();
       toast('Reserva restaurada', 'ok');
     } else {
       const body = await res.json() as { error?: { message: string } };
@@ -212,7 +198,7 @@ export default function AdminReservations(props: Props) {
             </div>
             <div class="bg-line-2 rounded-xl p-3.5">
               <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">atualizar</div>
-              <button type="button" onClick={() => { load(); loadConfirmedSnapshot(); }} class="text-sm font-semibold text-primary-h hover:text-primary-p flex items-center gap-1 cursor-pointer">
+              <button type="button" onClick={load} class="text-sm font-semibold text-primary-h hover:text-primary-p flex items-center gap-1 cursor-pointer">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
                 Refresh
               </button>
@@ -243,17 +229,19 @@ export default function AdminReservations(props: Props) {
         <div class="flex items-center gap-2 mb-4 border-b border-line">
           <button
             type="button"
-            onClick={() => { setTab('confirmada'); load(); }}
-            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer ${tab() === 'confirmada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
+            onClick={() => setTab('confirmada')}
+            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer flex items-center gap-1.5 ${tab() === 'confirmada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
           >
             Confirmadas
+            <span class={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tab() === 'confirmada' ? 'bg-ink text-white' : 'bg-line-2 text-ink-3'}`}>{stats().confirmed}</span>
           </button>
           <button
             type="button"
-            onClick={() => { setTab('cancelada'); load(); }}
-            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer ${tab() === 'cancelada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
+            onClick={() => setTab('cancelada')}
+            class={`px-3 lg:px-4 h-10 text-sm font-semibold relative -mb-px cursor-pointer flex items-center gap-1.5 ${tab() === 'cancelada' ? 'border-b-2 border-ink text-ink' : 'text-ink-3 hover:text-ink'}`}
           >
             Canceladas
+            <span class={`text-[10px] font-bold px-1.5 py-0.5 rounded ${tab() === 'cancelada' ? 'bg-ink text-white' : 'bg-line-2 text-ink-3'}`}>{stats().cancelled}</span>
           </button>
         </div>
 
