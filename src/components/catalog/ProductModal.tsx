@@ -9,25 +9,10 @@ interface Props {
   onClose: () => void;
 }
 
-const ASIN_REGEX = /\/dp\/([A-Z0-9]{10})(?:[/?]|$)/i;
-
-function extractAsin(p: Product): string | null {
-  if (p.amazon_dp && /^[A-Z0-9]{10}$/i.test(p.amazon_dp)) return p.amazon_dp;
-  const m = p.amazon_url.match(ASIN_REGEX);
-  return m ? m[1] : null;
-}
-
-/**
- * Monta link da Amazon já com a quantidade correta. Usa o endpoint de
- * add-to-cart oficial (ASIN.1 + Quantity.1) quando dá pra extrair o
- * ASIN; senão volta pro link normal do produto.
- */
-function buildAmazonUrl(p: Product, qty: number): string {
-  if (qty <= 1) return p.amazon_url;
-  const asin = extractAsin(p);
-  if (!asin) return p.amazon_url;
-  return `https://www.amazon.com.br/gp/aws/cart/add.html?ASIN.1=${asin}&Quantity.1=${qty}`;
-}
+// Amazon BR não respeita confiavelmente o endpoint gp/aws/cart/add.html
+// pra clientes sem credencial de afiliado — abre o carrinho vazio.
+// Mantemos o link direto do produto; a quantidade vive no nosso sistema
+// e o convidado ajusta no carrinho da Amazon se precisar.
 
 export default function ProductModal(props: Props) {
   const [name, setName] = createSignal('');
@@ -115,8 +100,10 @@ export default function ProductModal(props: Props) {
         return;
       }
       window.dispatchEvent(new CustomEvent('casacheia:reservation-created'));
-      // Redirect direto pra Amazon (carrinho c/ quantidade pré-selecionada).
-      window.location.assign(buildAmazonUrl(props.product, finalQty));
+      // Redirect direto pra página do produto na Amazon — qtd já foi
+      // reservada no nosso sistema; convidado ajusta no carrinho lá se
+      // precisar.
+      window.location.assign(props.product.amazon_url);
     } catch (e) {
       setError((e as Error).message);
       setSubmitting(false);
@@ -226,6 +213,11 @@ export default function ProductModal(props: Props) {
                     <span>{qty()}× {formatBRL(props.product.price_brl_cents)} =</span>
                     <strong class="text-ink text-sm">{formatBRL(lineTotal())}</strong>
                   </div>
+                </Show>
+                <Show when={qty() > 1}>
+                  <p class="-mt-1 text-[11px] text-ink-3 leading-relaxed">
+                    Ajuste a quantidade pra <strong>{qty()}</strong> no carrinho da Amazon antes de finalizar.
+                  </p>
                 </Show>
               </Show>
 
