@@ -57,6 +57,12 @@ button:disabled, [role="button"]:disabled, button[aria-disabled="true"] {
 .no-scrollbar::-webkit-scrollbar { display: none; }
 .no-scrollbar { scrollbar-width: none; }
 
+@keyframes toast-in {
+  from { transform: translateY(-12px); opacity: 0; }
+  to   { transform: translateY(0); opacity: 1; }
+}
+.animate-toast-in { animation: toast-in 180ms ease-out; }
+
 .checker-bg {
   background-image:
     linear-gradient(45deg, #f4f4f5 25%, transparent 25%),

@@ -2,6 +2,7 @@ import { createSignal, Show, onMount } from 'solid-js';
 import type { Product } from '~/types/shared';
 import AdminReservations from './AdminReservations';
 import AdminSettings from './AdminSettings';
+import DialogHost from './DialogHost';
 import { currentUser, logout } from '~/lib/auth';
 
 interface Props {
@@ -77,6 +78,8 @@ export default function AdminPanel(props: Props) {
       <Show when={tab() === 'configuracoes'}>
         <AdminSettings />
       </Show>
+
+      <DialogHost />
     </div>
   );
 }

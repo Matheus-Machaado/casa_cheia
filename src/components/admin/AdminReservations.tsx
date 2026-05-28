@@ -1,6 +1,7 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import type { Reservation, Product, MessageKind } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
+import { confirmDialog, promptDialog, toast } from './DialogHost';
 
 interface Props {
   products: Product[];
@@ -70,19 +71,34 @@ export default function AdminReservations(props: Props) {
   });
 
   async function cancel(id: string) {
-    if (!confirm('Tem certeza? O convidado pode já ter comprado o item.')) return;
-    const reason = prompt('Motivo (opcional, só pra você):') ?? null;
+    const ok = await confirmDialog({
+      title: 'Cancelar reserva?',
+      body: 'O convidado pode já ter comprado o presente. Confirme só se quer realmente cancelar.',
+      ok: 'Cancelar reserva',
+      cancel: 'Voltar',
+      danger: true,
+    });
+    if (!ok) return;
+    const reason = await promptDialog({
+      title: 'Motivo do cancelamento',
+      body: 'Opcional — fica registrado só pra você consultar depois.',
+      placeholder: 'Ex: convidado avisou que não vai',
+      ok: 'Cancelar reserva',
+      cancel: 'Voltar',
+    });
+    if (reason === null) return;
     const res = await authFetch(`/api/reservations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'cancel', reason }),
+      body: JSON.stringify({ action: 'cancel', reason: reason || null }),
     });
     if (res.ok) {
       load();
       loadConfirmedSnapshot();
+      toast('Reserva cancelada', 'ok');
     } else {
       const body = await res.json() as { error?: { message: string } };
-      alert(body.error?.message ?? 'Erro ao cancelar');
+      toast(body.error?.message ?? 'Erro ao cancelar', 'err');
     }
   }
 
@@ -95,9 +111,10 @@ export default function AdminReservations(props: Props) {
     if (res.ok) {
       load();
       loadConfirmedSnapshot();
+      toast('Reserva restaurada', 'ok');
     } else {
       const body = await res.json() as { error?: { message: string } };
-      alert(body.error?.message ?? 'Erro ao restaurar');
+      toast(body.error?.message ?? 'Erro ao restaurar', 'err');
     }
   }
 
@@ -109,7 +126,7 @@ export default function AdminReservations(props: Props) {
     });
     const body = await res.json() as { data?: { url: string; message: string }; error?: { message: string } };
     if (res.ok && body.data) return body.data;
-    alert(body.error?.message ?? 'Erro ao gerar link');
+    toast(body.error?.message ?? 'Erro ao gerar link', 'err');
     return null;
   }
 
@@ -121,7 +138,7 @@ export default function AdminReservations(props: Props) {
   function startBulk(kind: MessageKind) {
     const list = allConfirmed().filter((r) => r.guest_phone);
     if (list.length === 0) {
-      alert('Nenhuma reserva confirmada com telefone.');
+      toast('Nenhuma reserva confirmada com telefone.', 'warn');
       return;
     }
     setBulk({ kind, pending: list, current: list[0], total: list.length });
