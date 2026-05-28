@@ -425,7 +425,16 @@ export default function AdminProducts() {
                   />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1">
-                      <span class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">{ROOM_LABELS[p.room]}</span>
+                      <select
+                        value={p.room}
+                        onChange={(e) => patchProduct(p.id, { room: e.currentTarget.value as Room })}
+                        class="text-[10px] uppercase tracking-wider text-ink-3 font-bold bg-line-2 hover:bg-line border-0 rounded-md px-1.5 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary transition"
+                        aria-label="Cômodo"
+                      >
+                        <For each={ROOMS}>
+                          {(r) => <option value={r}>{ROOM_LABELS[r]}</option>}
+                        </For>
+                      </select>
                       <span class="text-[10px] text-ink-3">·</span>
                       <span class="text-[10px] text-ink-3 font-mono truncate">{p.id}</span>
                     </div>
