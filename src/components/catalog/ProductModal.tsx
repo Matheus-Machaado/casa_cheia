@@ -4,6 +4,7 @@ import { formatBRL, formatPhoneBR, isValidPhoneBR } from '~/lib/format';
 
 interface Props {
   product: Product;
+  roomLabel: string;
   availability: ProductAvailability | undefined;
   onClose: () => void;
 }
@@ -92,7 +93,7 @@ export default function ProductModal(props: Props) {
       <div class="bg-white w-full h-full lg:h-auto lg:max-w-lg lg:max-h-[92vh] overflow-y-auto lg:rounded-2xl shadow-lg flex flex-col">
         {/* Header */}
         <div class="sticky top-0 bg-white border-b border-line px-5 h-14 flex items-center justify-between z-10">
-          <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-line-2 text-ink-soft">{props.product.room}</span>
+          <span class="text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-line-2 text-ink-soft">{props.roomLabel}</span>
           <button
             type="button"
             onClick={props.onClose}

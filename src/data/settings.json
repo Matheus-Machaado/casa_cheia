@@ -11,5 +11,14 @@
   "event_state": "SP",
   "splash_title": "Ajude a Lina a deixar o apê cheinho.",
   "splash_subtitle": "Escolhe um presentinho lá embaixo. A cada item, a casa fica mais cheia — e a Lina mais feliz.",
+  "rooms": [
+    { "id": "cozinha", "label": "Cozinha", "order": 0 },
+    { "id": "eletro", "label": "Eletro", "order": 1 },
+    { "id": "quarto", "label": "Quarto", "order": 2 },
+    { "id": "banheiro", "label": "Banheiro", "order": 3 },
+    { "id": "lavanderia", "label": "Lavanderia", "order": 4 },
+    { "id": "sala", "label": "Sala", "order": 5 },
+    { "id": "limpeza", "label": "Limpeza", "order": 6 }
+  ],
   "reminder_enabled": true
 }

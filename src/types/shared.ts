@@ -1,27 +1,48 @@
-export type Room =
-  | 'cozinha' | 'eletro' | 'quarto' | 'banheiro' | 'lavanderia' | 'sala' | 'limpeza';
+/**
+ * Room é só um identificador (string). A lista de cômodos válidos
+ * vive em Settings.rooms e é editável pela Lina no painel.
+ */
+export type Room = string;
 
-export const ROOMS: Room[] = ['cozinha', 'eletro', 'quarto', 'banheiro', 'lavanderia', 'sala', 'limpeza'];
+export interface RoomDef {
+  id: string;
+  label: string;
+  order: number;
+}
 
-export const ROOM_LABELS: Record<Room, string> = {
-  cozinha: 'Cozinha',
-  eletro: 'Eletro',
-  quarto: 'Quarto',
-  banheiro: 'Banheiro',
-  lavanderia: 'Lavanderia',
-  sala: 'Sala',
-  limpeza: 'Limpeza',
-};
+export const DEFAULT_ROOMS: RoomDef[] = [
+  { id: 'cozinha', label: 'Cozinha', order: 0 },
+  { id: 'eletro', label: 'Eletro', order: 1 },
+  { id: 'quarto', label: 'Quarto', order: 2 },
+  { id: 'banheiro', label: 'Banheiro', order: 3 },
+  { id: 'lavanderia', label: 'Lavanderia', order: 4 },
+  { id: 'sala', label: 'Sala', order: 5 },
+  { id: 'limpeza', label: 'Limpeza', order: 6 },
+];
 
-export const ROOM_ICONS: Record<Room, string> = {
-  cozinha: 'utensils',
-  eletro: 'zap',
-  quarto: 'bed',
-  banheiro: 'bath',
-  lavanderia: 'shirt',
-  sala: 'sofa',
-  limpeza: 'sparkles',
-};
+/**
+ * Helper pra resolver label de um cômodo dado a lista atual. Se o id
+ * não existir mais (produto referenciando cômodo removido), volta
+ * o próprio id capitalizado.
+ */
+export function roomLabel(rooms: RoomDef[], id: string): string {
+  const found = rooms.find((r) => r.id === id);
+  if (found) return found.label;
+  return id.charAt(0).toUpperCase() + id.slice(1);
+}
+
+/**
+ * Gera um id slug a partir de um label livre. Lowercase, remove
+ * diacríticos (acentos) e troca não-alfanum por hífen.
+ */
+export function slugifyRoomId(label: string): string {
+  return label
+    .toLowerCase()
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 40);
+}
 
 export interface Product {
   id: string;
@@ -53,6 +74,7 @@ export interface Settings {
   event_address: string;
   splash_title: string;
   splash_subtitle: string;
+  rooms: RoomDef[];
   reminder_message_template: string;
   thankyou_complete_message_template: string;
   thankyou_post_message_template: string;

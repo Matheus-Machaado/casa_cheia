@@ -12,7 +12,10 @@ import { requireAdminUser } from '~/lib/serverAuth';
 
 export const prerender = false;
 
-const RoomEnum = z.enum(['cozinha', 'eletro', 'quarto', 'banheiro', 'lavanderia', 'sala', 'limpeza']);
+// Room agora é id livre (lowercase + hífen). Lista vive em Settings.rooms.
+const RoomSchema = z.string().trim().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, {
+  message: 'ID de cômodo inválido',
+});
 
 const MAX_PRICE_CENTS = 99_999_999; // R$ 999.999,99
 
@@ -27,7 +30,7 @@ const PatchSchema = z.object({
     qty_desejada: z.number().int().min(0).max(1000).optional(),
     order: z.number().int().min(0).max(9999).optional(),
     active: z.boolean().optional(),
-    room: RoomEnum.optional(),
+    room: RoomSchema.optional(),
   }),
 });
 
@@ -41,7 +44,7 @@ const CreateSchema = z.object({
   amazon_url: z.string().trim().url().max(500),
   image_url: z.string().trim().url().max(500),
   description: z.string().trim().max(500).default(''),
-  room: RoomEnum,
+  room: RoomSchema,
   qty_desejada: z.number().int().min(1).max(1000).default(1),
   order: z.number().int().min(0).max(9999).optional(),
   active: z.boolean().default(true),

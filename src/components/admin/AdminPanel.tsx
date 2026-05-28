@@ -1,11 +1,11 @@
 import { createSignal, Show, onMount, onCleanup } from 'solid-js';
-import type { Product } from '~/types/shared';
+import type { Product, Settings } from '~/types/shared';
 import AdminReservations from './AdminReservations';
 import AdminSettings from './AdminSettings';
 import AdminProducts from './AdminProducts';
 import DialogHost, { confirmDialog, toast } from './DialogHost';
-import { currentUser, logout } from '~/lib/auth';
-import { hasPendingChanges, pendingCount, describePending, publishAll, discardAll } from './draftStore';
+import { authFetch, currentUser, isLoggedIn, logout } from '~/lib/auth';
+import { hasPendingChanges, pendingCount, describePending, publishAll, discardAll, getPristineSettings, loadPristineSettings } from './draftStore';
 
 interface Props {
   products: Product[];
@@ -21,6 +21,21 @@ export default function AdminPanel(props: Props) {
   onMount(() => {
     const u = currentUser();
     if (u) setUserEmail(u.email);
+
+    // Pré-carrega settings em background pra qualquer tab ter acesso
+    // a rooms/datas/etc. AdminSettings também carrega; primeiro a
+    // chegar ganha (loadPristineSettings só sobrescreve se ainda não
+    // tem nada).
+    if (isLoggedIn() && !getPristineSettings()) {
+      authFetch('/api/admin/settings')
+        .then((res) => res.ok ? res.json() : null)
+        .then((body: { data?: { settings: Settings } } | null) => {
+          if (body?.data?.settings && !getPristineSettings()) {
+            loadPristineSettings(body.data.settings);
+          }
+        })
+        .catch(() => {/* silencioso — AdminSettings tenta de novo */});
+    }
 
     const beforeUnload = (e: BeforeUnloadEvent) => {
       if (hasPendingChanges()) {

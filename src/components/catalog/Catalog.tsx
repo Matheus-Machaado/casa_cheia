@@ -1,11 +1,12 @@
 import { createSignal, createMemo, For, onMount, Show } from 'solid-js';
-import type { Product, Room, AvailabilitySnapshot } from '~/types/shared';
-import { ROOMS, ROOM_LABELS } from '~/types/shared';
+import type { Product, Room, RoomDef, AvailabilitySnapshot } from '~/types/shared';
+import { roomLabel as resolveRoomLabel } from '~/types/shared';
 import { formatBRL } from '~/lib/format';
 import ProductModal from './ProductModal';
 
 interface Props {
   products: Product[];
+  rooms: RoomDef[];
 }
 
 const ROOM_ICONS: Record<string, string> = {
@@ -136,15 +137,17 @@ export default function Catalog(props: Props) {
             >
               Todos
             </button>
-            <For each={ROOMS}>
+            <For each={props.rooms}>
               {(r) => (
                 <button
                   type="button"
-                  onClick={() => setFilter(r)}
-                  class={`px-3.5 h-8 rounded-full border text-[13px] font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${filter() === r ? 'bg-ink border-ink text-white' : 'bg-white border-line text-ink-soft hover:bg-line-2'}`}
+                  onClick={() => setFilter(r.id)}
+                  class={`px-3.5 h-8 rounded-full border text-[13px] font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${filter() === r.id ? 'bg-ink border-ink text-white' : 'bg-white border-line text-ink-soft hover:bg-line-2'}`}
                 >
-                  <span>{ROOM_ICONS[r]}</span>
-                  <span>{ROOM_LABELS[r]}</span>
+                  <Show when={ROOM_ICONS[r.id]}>
+                    <span>{ROOM_ICONS[r.id]}</span>
+                  </Show>
+                  <span>{r.label}</span>
                 </button>
               )}
             </For>
@@ -194,7 +197,7 @@ export default function Catalog(props: Props) {
                       </Show>
                     </div>
                     <div class="p-3 flex-1 flex flex-col gap-1.5">
-                      <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">{p.room}</div>
+                      <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">{resolveRoomLabel(props.rooms, p.room)}</div>
                       <div class="text-sm font-semibold text-ink leading-snug line-clamp-2 flex-1">{p.title}</div>
                       <div class="text-base lg:text-lg font-bold text-ink">{formatBRL(p.price_brl_cents)}</div>
                     </div>
@@ -209,6 +212,7 @@ export default function Catalog(props: Props) {
       <Show when={selected() !== null}>
         <ProductModal
           product={selected()!}
+          roomLabel={resolveRoomLabel(props.rooms, selected()!.room)}
           availability={availability()?.products[selected()!.id]}
           onClose={() => setSelected(null)}
         />

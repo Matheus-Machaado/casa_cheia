@@ -1,6 +1,6 @@
 import { createSignal, createMemo, createEffect, For, Show, onMount } from 'solid-js';
-import type { Product, Room } from '~/types/shared';
-import { ROOMS, ROOM_LABELS } from '~/types/shared';
+import type { Product, Room, RoomDef } from '~/types/shared';
+import { DEFAULT_ROOMS, roomLabel } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
 import { formatBRL } from '~/lib/format';
 import { applyBRLMask, formatCentsAsBRL, parseBRLToCents, PRICE_BRL_INPUT_MAX_LENGTH } from '~/lib/masks';
@@ -13,6 +13,7 @@ import {
   deleteProduct as draftDeleteProduct,
   markProductForReset,
   getPristineProducts,
+  draftSettings,
 } from './draftStore';
 
 interface NewProductDraft {
@@ -31,9 +32,13 @@ const EMPTY_DRAFT: NewProductDraft = {
   amazon_url: '',
   image_url: '',
   description: '',
-  room: 'cozinha',
+  room: '', // preenchido onMount com primeiro cômodo disponível
   qty_desejada: 1,
 };
+
+function getRooms(): RoomDef[] {
+  return draftSettings()?.rooms ?? DEFAULT_ROOMS;
+}
 
 async function uploadImage(file: File): Promise<string | null> {
   if (file.size > 5 * 1024 * 1024) {
@@ -357,7 +362,11 @@ export default function AdminProducts() {
         </div>
         <button
           type="button"
-          onClick={() => setShowCreate(true)}
+          onClick={() => {
+            const rooms = getRooms();
+            setDraft({ ...EMPTY_DRAFT, room: rooms[0]?.id ?? '' });
+            setShowCreate(true);
+          }}
           class="shrink-0 h-10 px-4 rounded-xl bg-primary hover:bg-primary-h text-white text-sm font-semibold transition cursor-pointer flex items-center justify-center gap-1.5"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -381,9 +390,9 @@ export default function AdminProducts() {
         </div>
         <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
           <button type="button" onClick={() => setFilter('all')} class={`shrink-0 px-3 h-9 rounded-full border text-xs font-semibold transition cursor-pointer ${filter() === 'all' ? 'bg-ink border-ink text-white' : 'bg-white border-line text-ink-soft hover:bg-line-2'}`}>Todos</button>
-          <For each={ROOMS}>
+          <For each={getRooms()}>
             {(r) => (
-              <button type="button" onClick={() => setFilter(r)} class={`shrink-0 px-3 h-9 rounded-full border text-xs font-semibold transition cursor-pointer ${filter() === r ? 'bg-ink border-ink text-white' : 'bg-white border-line text-ink-soft hover:bg-line-2'}`}>{ROOM_LABELS[r]}</button>
+              <button type="button" onClick={() => setFilter(r.id)} class={`shrink-0 px-3 h-9 rounded-full border text-xs font-semibold transition cursor-pointer ${filter() === r.id ? 'bg-ink border-ink text-white' : 'bg-white border-line text-ink-soft hover:bg-line-2'}`}>{r.label}</button>
             )}
           </For>
         </div>
@@ -427,12 +436,15 @@ export default function AdminProducts() {
                     <div class="flex items-center gap-2 mb-1">
                       <select
                         value={p.room}
-                        onChange={(e) => patchProduct(p.id, { room: e.currentTarget.value as Room })}
+                        onChange={(e) => patchProduct(p.id, { room: e.currentTarget.value })}
                         class="text-[10px] uppercase tracking-wider text-ink-3 font-bold bg-line-2 hover:bg-line border-0 rounded-md px-1.5 py-0.5 cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary transition"
                         aria-label="Cômodo"
                       >
-                        <For each={ROOMS}>
-                          {(r) => <option value={r}>{ROOM_LABELS[r]}</option>}
+                        <Show when={!getRooms().some((r) => r.id === p.room)}>
+                          <option value={p.room}>{roomLabel(getRooms(), p.room)} (removido)</option>
+                        </Show>
+                        <For each={getRooms()}>
+                          {(r) => <option value={r.id}>{r.label}</option>}
                         </For>
                       </select>
                       <span class="text-[10px] text-ink-3">·</span>
@@ -567,11 +579,12 @@ export default function AdminProducts() {
 
               <div>
                 <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Cômodo</label>
-                <select value={draft().room} onChange={(e) => updateDraft('room', e.currentTarget.value as Room)} class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition cursor-pointer">
-                  <For each={ROOMS}>
-                    {(r) => <option value={r}>{ROOM_LABELS[r]}</option>}
+                <select value={draft().room} onChange={(e) => updateDraft('room', e.currentTarget.value)} class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition cursor-pointer">
+                  <For each={getRooms()}>
+                    {(r) => <option value={r.id}>{r.label}</option>}
                   </For>
                 </select>
+                <p class="text-[11px] text-ink-3 mt-1.5">Adicione um cômodo novo em <strong>Configurações → Cômodos</strong>.</p>
               </div>
 
               <div>

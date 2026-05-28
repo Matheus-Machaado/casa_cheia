@@ -1,9 +1,10 @@
-import { onMount, Show, For } from 'solid-js';
-import type { Settings } from '~/types/shared';
+import { createSignal, onMount, Show, For } from 'solid-js';
+import type { Settings, RoomDef } from '~/types/shared';
+import { slugifyRoomId } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
 import { applyCEPMask, parseCEPDigits, CEP_INPUT_MAX_LENGTH } from '~/lib/masks';
-import { toast } from './DialogHost';
-import { draftSettings, loadPristineSettings, updateSettingsPatch, patchSettingsBulk, getPristineSettings } from './draftStore';
+import { confirmDialog, toast } from './DialogHost';
+import { draftSettings, loadPristineSettings, updateSettingsPatch, patchSettingsBulk, getPristineSettings, draftProducts } from './draftStore';
 
 interface ViaCepResponse {
   cep?: string;
@@ -287,6 +288,8 @@ export default function AdminSettings() {
               </div>
             </section>
 
+            <RoomsManager rooms={s().rooms} />
+
             <div class="bg-white border border-line rounded-2xl p-5 lg:p-6">
               <h2 class="text-lg font-bold text-ink tracking-tight mb-1">Templates das mensagens</h2>
               <p class="text-sm text-ink-soft">Você dispara cada uma manualmente — a plataforma só monta a mensagem prontinha com o nome do convidado e abre o WhatsApp pra você dar enviar.</p>
@@ -325,5 +328,163 @@ export default function AdminSettings() {
         )}
       </Show>
     </div>
+  );
+}
+
+function RoomsManager(props: { rooms: RoomDef[] }) {
+  const [newLabel, setNewLabel] = createSignal('');
+
+  function commitRooms(next: RoomDef[]) {
+    // reordena order pelo índice atual
+    const normalized = next.map((r, i) => ({ ...r, order: i }));
+    updateSettingsPatch('rooms', normalized);
+  }
+
+  function moveRoom(idx: number, dir: -1 | 1) {
+    const target = idx + dir;
+    if (target < 0 || target >= props.rooms.length) return;
+    const next = props.rooms.slice();
+    [next[idx], next[target]] = [next[target], next[idx]];
+    commitRooms(next);
+  }
+
+  function renameRoom(idx: number, label: string) {
+    const next = props.rooms.slice();
+    next[idx] = { ...next[idx], label };
+    commitRooms(next);
+  }
+
+  function countProductsInRoom(id: string): number {
+    return draftProducts().filter((p) => p.room === id).length;
+  }
+
+  async function deleteRoom(idx: number) {
+    const room = props.rooms[idx];
+    const inUse = countProductsInRoom(room.id);
+    const body = inUse > 0
+      ? `${inUse} produto(s) estão neste cômodo. Eles continuam no catálogo, mas vão aparecer como "${room.label} (removido)" até você reatribuir. Quer continuar?`
+      : `Remove "${room.label}" da lista. Você pode adicionar de novo depois.`;
+    const ok = await confirmDialog({
+      title: 'Remover cômodo?',
+      body,
+      ok: 'Remover',
+      cancel: 'Voltar',
+      danger: inUse > 0,
+    });
+    if (!ok) return;
+    const next = props.rooms.filter((_, i) => i !== idx);
+    if (next.length === 0) {
+      toast('Precisa ter pelo menos um cômodo', 'warn');
+      return;
+    }
+    commitRooms(next);
+    toast('Cômodo removido do rascunho', 'ok', 1800);
+  }
+
+  function addRoom() {
+    const label = newLabel().trim();
+    if (label.length < 1) return;
+    const baseId = slugifyRoomId(label);
+    if (!baseId) {
+      toast('Nome inválido pra gerar id', 'warn');
+      return;
+    }
+    let id = baseId;
+    let i = 1;
+    while (props.rooms.some((r) => r.id === id)) {
+      id = `${baseId}-${++i}`;
+    }
+    const next = [...props.rooms, { id, label, order: props.rooms.length }];
+    commitRooms(next);
+    setNewLabel('');
+    toast(`Cômodo "${label}" adicionado ao rascunho`, 'ok', 2000);
+  }
+
+  function onAddKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addRoom();
+    }
+  }
+
+  return (
+    <section class="bg-white border border-line rounded-2xl p-5 lg:p-6">
+      <h2 class="text-lg font-bold text-ink tracking-tight">Cômodos</h2>
+      <p class="text-sm text-ink-soft mt-0.5 mb-4">Cada produto entra em um cômodo. Adicione, renomeie ou reordene como preferir — aparece nos filtros do catálogo e no card de cada produto.</p>
+
+      <div class="space-y-2">
+        <For each={props.rooms}>
+          {(r, i) => {
+            const used = () => countProductsInRoom(r.id);
+            return (
+              <div class="flex items-center gap-2 p-2 rounded-xl bg-line-2/60 border border-line">
+                <div class="flex flex-col gap-0.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => moveRoom(i(), -1)}
+                    disabled={i() === 0}
+                    class="w-6 h-5 grid place-items-center text-ink-3 hover:text-ink rounded disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
+                    aria-label="Subir"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => moveRoom(i(), 1)}
+                    disabled={i() === props.rooms.length - 1}
+                    class="w-6 h-5 grid place-items-center text-ink-3 hover:text-ink rounded disabled:opacity-25 disabled:cursor-not-allowed cursor-pointer"
+                    aria-label="Descer"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  value={r.label}
+                  maxLength={40}
+                  onInput={(e) => renameRoom(i(), e.currentTarget.value)}
+                  class="flex-1 h-10 px-3 bg-white border-0 rounded-lg text-sm font-semibold text-ink focus:outline-none focus:ring-2 focus:ring-primary transition"
+                />
+                <span class="text-[10px] text-ink-3 font-mono shrink-0 hidden sm:inline">{r.id}</span>
+                <Show when={used() > 0}>
+                  <span class="text-[10px] uppercase tracking-wider text-ink-3 font-bold bg-line-2 px-1.5 py-0.5 rounded shrink-0">{used()} prod</span>
+                </Show>
+                <button
+                  type="button"
+                  onClick={() => deleteRoom(i())}
+                  class="w-9 h-9 grid place-items-center text-ink-3 hover:text-danger hover:bg-danger-s rounded-lg transition cursor-pointer shrink-0"
+                  aria-label={`Remover ${r.label}`}
+                  title="Remover cômodo"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                </button>
+              </div>
+            );
+          }}
+        </For>
+      </div>
+
+      <div class="mt-4 p-3 rounded-xl bg-primary-s/30 border border-primary/20 flex items-center gap-2">
+        <input
+          type="text"
+          value={newLabel()}
+          maxLength={40}
+          placeholder="Ex: Varanda, Escritório, Área gourmet..."
+          onInput={(e) => setNewLabel(e.currentTarget.value)}
+          onKeyDown={onAddKey}
+          class="flex-1 h-10 px-3 bg-white border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
+        />
+        <button
+          type="button"
+          onClick={addRoom}
+          disabled={newLabel().trim().length < 1}
+          class="h-10 px-4 rounded-lg bg-primary hover:bg-primary-h text-sm font-semibold text-white transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-1.5"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Adicionar
+        </button>
+      </div>
+      <p class="text-[11px] text-ink-3 mt-2">Mudanças entram no rascunho. Clique em <strong>Publicar</strong> no topo pra subir.</p>
+    </section>
   );
 }

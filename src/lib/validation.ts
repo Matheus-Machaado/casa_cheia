@@ -18,6 +18,14 @@ export const ReservationActionSchema = z.object({
   reason: z.string().max(200).nullable().optional(),
 });
 
+const RoomDefSchema = z.object({
+  id: z.string().trim().min(1).max(40).regex(/^[a-z0-9][a-z0-9-]*$/, {
+    message: 'ID do cômodo deve ser minúsculo, sem espaços (use hífen)',
+  }),
+  label: z.string().trim().min(1).max(40),
+  order: z.number().int().min(0).max(9999),
+});
+
 export const SettingsUpdateSchema = z.object({
   bride_name: z.string().trim().min(1).max(80).optional(),
   event_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, { message: 'Data inválida (YYYY-MM-DD)' }).optional(),
@@ -31,6 +39,7 @@ export const SettingsUpdateSchema = z.object({
   event_state: z.string().trim().regex(/^[A-Z]{2}$/, { message: 'UF deve ter 2 letras maiúsculas' }).optional(),
   splash_title: z.string().trim().min(3).max(120).optional(),
   splash_subtitle: z.string().trim().min(3).max(240).optional(),
+  rooms: z.array(RoomDefSchema).min(1).max(50).optional(),
   reminder_message_template: z.string().trim().min(10).max(1000).optional(),
   thankyou_complete_message_template: z.string().trim().min(10).max(1000).optional(),
   thankyou_post_message_template: z.string().trim().min(10).max(1000).optional(),

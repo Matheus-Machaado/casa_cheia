@@ -1,5 +1,6 @@
 import { getStore } from '@netlify/blobs';
-import type { Settings } from '~/types/shared';
+import type { Settings, RoomDef } from '~/types/shared';
+import { DEFAULT_ROOMS } from '~/types/shared';
 import settingsData from '~/data/settings.json';
 import { DEFAULTS as MSG_DEFAULTS } from './messages';
 
@@ -19,9 +20,27 @@ interface DynamicSettings {
   event_state: string;
   splash_title: string;
   splash_subtitle: string;
+  rooms: RoomDef[];
   reminder_message_template: string;
   thankyou_complete_message_template: string;
   thankyou_post_message_template: string;
+}
+
+function normalizeRooms(raw: unknown): RoomDef[] {
+  if (!Array.isArray(raw) || raw.length === 0) return DEFAULT_ROOMS.slice();
+  const seen = new Set<string>();
+  const list: RoomDef[] = [];
+  for (const r of raw) {
+    if (!r || typeof r !== 'object') continue;
+    const id = String((r as { id?: unknown }).id ?? '').trim();
+    const label = String((r as { label?: unknown }).label ?? '').trim();
+    const order = Number((r as { order?: unknown }).order ?? 0);
+    if (!id || !label || seen.has(id)) continue;
+    seen.add(id);
+    list.push({ id, label, order: isFinite(order) ? order : 0 });
+  }
+  if (list.length === 0) return DEFAULT_ROOMS.slice();
+  return list.sort((a, b) => a.order - b.order);
 }
 
 const DYNAMIC_DEFAULTS: DynamicSettings = {
@@ -37,6 +56,7 @@ const DYNAMIC_DEFAULTS: DynamicSettings = {
   event_state: settingsData.event_state,
   splash_title: settingsData.splash_title,
   splash_subtitle: settingsData.splash_subtitle,
+  rooms: normalizeRooms((settingsData as { rooms?: unknown }).rooms),
   reminder_message_template: MSG_DEFAULTS.reminder_message_template,
   thankyou_complete_message_template: MSG_DEFAULTS.thankyou_complete_message_template,
   thankyou_post_message_template: MSG_DEFAULTS.thankyou_post_message_template,
@@ -75,6 +95,7 @@ function mergeWithDefaults(dynamic: Partial<DynamicSettings>): Settings {
     event_state: dynamic.event_state ?? DYNAMIC_DEFAULTS.event_state,
     splash_title: dynamic.splash_title ?? DYNAMIC_DEFAULTS.splash_title,
     splash_subtitle: dynamic.splash_subtitle ?? DYNAMIC_DEFAULTS.splash_subtitle,
+    rooms: dynamic.rooms ? normalizeRooms(dynamic.rooms) : DYNAMIC_DEFAULTS.rooms,
     reminder_message_template: dynamic.reminder_message_template ?? DYNAMIC_DEFAULTS.reminder_message_template,
     thankyou_complete_message_template: dynamic.thankyou_complete_message_template ?? DYNAMIC_DEFAULTS.thankyou_complete_message_template,
     thankyou_post_message_template: dynamic.thankyou_post_message_template ?? DYNAMIC_DEFAULTS.thankyou_post_message_template,
@@ -117,7 +138,11 @@ export async function updateRuntimeSettings(patch: Partial<DynamicSettings>): Pr
   for (const k of Object.keys(patch) as Array<keyof DynamicSettings>) {
     const v = patch[k];
     if (v === undefined) continue;
-    (next as Record<string, unknown>)[k] = v;
+    if (k === 'rooms') {
+      (next as Record<string, unknown>).rooms = normalizeRooms(v);
+    } else {
+      (next as Record<string, unknown>)[k] = v;
+    }
   }
   await writeDynamic(next);
   return mergeWithDefaults(next);
