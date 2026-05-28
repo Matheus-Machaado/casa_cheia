@@ -1,6 +1,6 @@
 import { createSignal, createMemo, Show, onMount, onCleanup } from 'solid-js';
 import type { Product, ProductAvailability } from '~/types/shared';
-import { formatBRL, formatPhoneBR, isValidEmail, isValidPhoneBR } from '~/lib/format';
+import { formatBRL, formatPhoneBR, isValidPhoneBR } from '~/lib/format';
 
 interface Props {
   product: Product;
@@ -11,15 +11,13 @@ interface Props {
 declare const confetti: ((options: { particleCount: number; spread: number; origin: { y: number }; colors: string[] }) => void) | undefined;
 
 export default function ProductModal(props: Props) {
-  const [step, setStep] = createSignal<'detail' | 'form' | 'success'>('detail');
+  const [step, setStep] = createSignal<'detail' | 'form'>('detail');
   const [qty, setQty] = createSignal(1);
   const [name, setName] = createSignal('');
-  const [email, setEmail] = createSignal('');
   const [phone, setPhone] = createSignal('');
   const [message, setMessage] = createSignal('');
   const [submitting, setSubmitting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
-  const [successName, setSuccessName] = createSignal('');
 
   const max = () => props.availability?.available ?? props.product.qty_desejada;
 
@@ -32,8 +30,7 @@ export default function ProductModal(props: Props) {
   const canSubmit = createMemo(() => {
     if (submitting()) return false;
     if (name().trim().length < 2) return false;
-    if (!isValidEmail(email())) return false;
-    if (phone() && !isValidPhoneBR(phone())) return false;
+    if (!isValidPhoneBR(phone())) return false;
     return true;
   });
 
@@ -71,8 +68,7 @@ export default function ProductModal(props: Props) {
           product_id: props.product.id,
           qty: qty(),
           guest_name: name().trim(),
-          guest_email: email().trim().toLowerCase(),
-          guest_phone: phone().trim() || null,
+          guest_phone: phone().trim(),
           message: message().trim() || null,
           hp_url: '',
         }),
@@ -82,12 +78,12 @@ export default function ProductModal(props: Props) {
         setError(body.error?.message ?? 'Erro ao reservar');
         return;
       }
-      setSuccessName(body.data!.guest_name);
-      setStep('success');
       window.dispatchEvent(new CustomEvent('casacheia:reservation-created'));
       if (typeof confetti !== 'undefined') {
         confetti({ particleCount: 70, spread: 70, origin: { y: 0.6 }, colors: ['#F43F5E', '#FACC15', '#10B981'] });
       }
+      window.open(props.product.amazon_url, '_blank', 'noopener,noreferrer');
+      props.onClose();
     } catch (e) {
       setError((e as Error).message);
     } finally {
@@ -115,7 +111,7 @@ export default function ProductModal(props: Props) {
           >
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
           </button>
-          <div class="text-sm font-semibold text-ink">{step() === 'detail' ? 'Detalhe' : step() === 'form' ? 'Seus dados' : 'Pronto'}</div>
+          <div class="text-sm font-semibold text-ink">{step() === 'detail' ? 'Detalhe' : 'Seus dados'}</div>
           <button
             type="button"
             onClick={props.onClose}
@@ -145,41 +141,69 @@ export default function ProductModal(props: Props) {
               <div class="flex items-baseline gap-2 mb-4">
                 <span class="text-3xl font-bold text-ink">{formatBRL(props.product.price_brl_cents)}</span>
               </div>
-              <div class="flex items-center gap-2 mb-4 p-3 bg-line-2 rounded-xl">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
-                <span class="text-sm text-ink-soft"><strong class="text-ink">{max()} de {props.product.qty_desejada}</strong> disponível{max() === 1 ? '' : 'is'}</span>
-              </div>
+              <Show
+                when={max() > 0}
+                fallback={
+                  <div class="flex items-center gap-2 mb-4 p-3 bg-ink rounded-xl">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-white"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg>
+                    <span class="text-sm text-white font-semibold">Esgotado · alguém já vai trazer esse</span>
+                  </div>
+                }
+              >
+                <div class="flex items-center gap-2 mb-4 p-3 bg-line-2 rounded-xl">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-primary"><path d="M16.5 9.4 7.5 4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                  <span class="text-sm text-ink-soft"><strong class="text-ink">{max()} de {props.product.qty_desejada}</strong> disponível{max() === 1 ? '' : 'is'}</span>
+                </div>
+              </Show>
               <p class="text-sm text-ink-soft leading-relaxed mb-5">{props.product.description}</p>
 
-              <div class="mb-5">
-                <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-2">Quantos vai trazer</label>
-                <div class="flex items-center gap-3">
-                  <button type="button" onClick={() => setQty(Math.max(1, qty() - 1))} class="w-11 h-11 rounded-full bg-line-2 hover:bg-line grid place-items-center text-ink" aria-label="Menos">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </button>
-                  <div class="text-2xl font-bold text-ink min-w-12 text-center">{qty()}</div>
-                  <button type="button" onClick={() => setQty(Math.min(max(), qty() + 1))} class="w-11 h-11 rounded-full bg-line-2 hover:bg-line grid place-items-center text-ink" aria-label="Mais">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                  </button>
-                  <Show when={total()}>
-                    <div class="ml-auto text-right">
-                      <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">Total</div>
-                      <div class="text-xl font-bold text-ink">{total()}</div>
-                    </div>
-                  </Show>
+              <Show when={max() > 0}>
+                <div class="mb-5">
+                  <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-2">Quantos vai trazer</label>
+                  <div class="flex items-center gap-3">
+                    <button type="button" onClick={() => setQty(Math.max(1, qty() - 1))} class="w-11 h-11 rounded-full bg-line-2 hover:bg-line grid place-items-center text-ink" aria-label="Menos">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <div class="text-2xl font-bold text-ink min-w-12 text-center">{qty()}</div>
+                    <button type="button" onClick={() => setQty(Math.min(max(), qty() + 1))} class="w-11 h-11 rounded-full bg-line-2 hover:bg-line grid place-items-center text-ink" aria-label="Mais">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    </button>
+                    <Show when={total()}>
+                      <div class="ml-auto text-right">
+                        <div class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">Total</div>
+                        <div class="text-xl font-bold text-ink">{total()}</div>
+                      </div>
+                    </Show>
+                  </div>
                 </div>
-              </div>
+              </Show>
 
-              <button
-                type="button"
-                onClick={() => setStep('form')}
-                disabled={max() <= 0}
-                class="w-full h-12 rounded-xl bg-primary hover:bg-primary-h active:bg-primary-p text-white font-semibold transition flex items-center justify-center gap-2 shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
+              <Show
+                when={max() > 0}
+                fallback={
+                  <div class="space-y-3">
+                    <button
+                      type="button"
+                      onClick={props.onClose}
+                      class="w-full h-12 rounded-xl bg-ink hover:bg-ink-2 text-white font-semibold transition flex items-center justify-center gap-2"
+                    >
+                      Ver outros presentes
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </button>
+                    <a href={props.product.amazon_url} target="_blank" rel="noopener noreferrer" class="block text-center text-xs text-ink-3 hover:text-ink underline underline-offset-4">Ver na Amazon assim mesmo</a>
+                  </div>
+                }
               >
-                Eu vou trazer
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
-              </button>
-              <a href={props.product.amazon_url} target="_blank" rel="noopener noreferrer" class="block mt-3 text-center text-xs text-ink-3 hover:text-ink underline underline-offset-4">Ver direto na Amazon</a>
+                <button
+                  type="button"
+                  onClick={() => setStep('form')}
+                  class="w-full h-12 rounded-xl bg-primary hover:bg-primary-h active:bg-primary-p text-white font-semibold transition flex items-center justify-center gap-2 shadow-pop"
+                >
+                  Eu vou trazer
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/></svg>
+                </button>
+                <a href={props.product.amazon_url} target="_blank" rel="noopener noreferrer" class="block mt-3 text-center text-xs text-ink-3 hover:text-ink underline underline-offset-4">Ver direto na Amazon</a>
+              </Show>
             </div>
           </div>
         </Show>
@@ -195,7 +219,7 @@ export default function ProductModal(props: Props) {
             </div>
             <div class="lg:hidden mb-5">
               <h2 class="text-2xl font-bold text-ink tracking-tight">Quase lá!</h2>
-              <p class="text-sm text-ink-soft mt-1">Preenche e a gente te manda o link Amazon na hora.</p>
+              <p class="text-sm text-ink-soft mt-1">Preenche que abrimos a Amazon na hora. Vamos te lembrar no WhatsApp perto do chá.</p>
             </div>
 
             <form onSubmit={submit} class="space-y-3">
@@ -214,22 +238,11 @@ export default function ProductModal(props: Props) {
                 />
               </div>
               <div>
-                <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Email</label>
-                <input
-                  required
-                  type="email"
-                  maxLength={120}
-                  placeholder="ana@email.com"
-                  value={email()}
-                  onInput={(e) => setEmail(e.currentTarget.value)}
-                  class="w-full h-12 px-4 bg-line-2 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
-                />
-              </div>
-              <div>
                 <label class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">
-                  Telefone <span class="normal-case text-ink-3 font-medium">(opcional, pra lembrete)</span>
+                  WhatsApp <span class="normal-case text-ink-3 font-medium">(pra lembrete antes do chá)</span>
                 </label>
                 <input
+                  required
                   type="tel"
                   inputMode="numeric"
                   maxLength={15}
@@ -262,26 +275,13 @@ export default function ProductModal(props: Props) {
                 disabled={!canSubmit()}
                 class="w-full h-12 rounded-xl bg-primary hover:bg-primary-h active:bg-primary-p text-white font-semibold transition flex items-center justify-center gap-2 shadow-pop disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                {submitting() ? 'Enviando...' : 'Confirmar e receber link'}
+                {submitting() ? 'Reservando...' : 'Confirmar e abrir Amazon'}
                 <Show when={!submitting()}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                 </Show>
               </button>
-              <p class="text-[11px] text-ink-3 text-center leading-relaxed">Ao confirmar, você recebe o link Amazon no email agora mesmo.</p>
+              <p class="text-[11px] text-ink-3 text-center leading-relaxed">Ao confirmar, abrimos a Amazon do produto em nova aba.</p>
             </form>
-          </div>
-        </Show>
-
-        <Show when={step() === 'success'}>
-          <div class="p-7 text-center flex-1 flex flex-col items-center justify-center">
-            <div class="w-16 h-16 rounded-full bg-success-s grid place-items-center mb-5">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-success"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-            </div>
-            <h2 class="text-2xl font-bold text-ink tracking-tight mb-2">Obrigada, <span class="font-display italic font-medium text-primary">{successName()}</span>!</h2>
-            <p class="text-sm text-ink-soft leading-relaxed mb-6">Já caiu o email com o link Amazon. Compra quando quiser e me avisa no dia!</p>
-            <button type="button" onClick={props.onClose} class="w-full max-w-xs h-12 rounded-xl bg-primary hover:bg-primary-h text-white font-semibold transition">
-              Continuar olhando
-            </button>
           </div>
         </Show>
       </div>

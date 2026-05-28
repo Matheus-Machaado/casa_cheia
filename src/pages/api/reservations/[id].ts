@@ -1,10 +1,10 @@
 import type { APIRoute } from 'astro';
 import { json, errorResponse } from '~/lib/api';
 import { ReservationActionSchema } from '~/lib/validation';
-import { getReservation, updateReservation, updateProductCounter } from '~/lib/blobs';
+import { getReservation, updateReservation, updateProductCounter, getProductCounter } from '~/lib/blobs';
 import { getProductById } from '~/lib/products';
-import { getSettings } from '~/lib/settings';
-import { sendCancellation } from '~/lib/email';
+import { getRuntimeSettings } from '~/lib/settings';
+import { sendCancellationToAdmin } from '~/lib/email';
 
 export const prerender = false;
 
@@ -42,13 +42,14 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     await updateReservation(reservation, previousStatus);
     await updateProductCounter(product.id, product.qty_desejada, -reservation.qty);
 
-    const settings = getSettings();
-    const emailResult = await sendCancellation(reservation, product, settings).catch((e) => ({ id: null, error: (e as Error).message }));
-    reservation.email_log.push({
+    const settings = await getRuntimeSettings();
+    const emailResult = await sendCancellationToAdmin(reservation, product, settings).catch((e) => ({ id: null, error: (e as Error).message }));
+    reservation.activity_log.push({
+      channel: 'email',
       type: 'cancellation',
       sent_at: new Date().toISOString(),
-      resend_message_id: emailResult.id,
-      to: reservation.guest_email,
+      provider_message_id: emailResult.id,
+      to: 'admin',
       error: emailResult.error,
     });
     await updateReservation(reservation);
@@ -56,8 +57,6 @@ export const PATCH: APIRoute = async ({ params, request, locals }) => {
     if (reservation.status === 'confirmada') {
       return errorResponse('CONFLICT', 'Reserva já está confirmada', 409);
     }
-    // Verify availability before restoring
-    const { getProductCounter } = await import('~/lib/blobs');
     const counter = await getProductCounter(product.id, product.qty_desejada);
     const available = product.qty_desejada - counter.qty_reservada;
     if (reservation.qty > available) {

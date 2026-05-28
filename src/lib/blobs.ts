@@ -118,3 +118,25 @@ export async function getAllCounters(): Promise<Record<string, ProductAvailabili
   }
   return out;
 }
+
+/**
+ * Total agregado de reservas confirmadas vs total desejado entre TODOS os
+ * produtos do catálogo passado em {@link expected}. Usado pra detectar
+ * quando a lista chegou em 100% e disparar o agradecimento.
+ */
+export async function computeTotalProgress(
+  expected: Array<{ id: string; qty_desejada: number }>,
+): Promise<{ total_reservada: number; total_desejada: number; complete: boolean }> {
+  let total_reservada = 0;
+  let total_desejada = 0;
+  for (const p of expected) {
+    const c = await getProductCounter(p.id, p.qty_desejada);
+    total_reservada += c.qty_reservada;
+    total_desejada += p.qty_desejada;
+  }
+  return {
+    total_reservada,
+    total_desejada,
+    complete: total_desejada > 0 && total_reservada >= total_desejada,
+  };
+}

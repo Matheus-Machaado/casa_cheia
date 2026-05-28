@@ -35,7 +35,6 @@ export interface Product {
   qty_desejada: number;
   order: number;
   active: boolean;
-  overlay_id: string | null;
 }
 
 export interface Settings {
@@ -46,6 +45,13 @@ export interface Settings {
   splash_title: string;
   splash_subtitle: string;
   reminder_enabled: boolean;
+  reminder_hours_before: number;
+  reminder_message_template: string;
+  thankyou_enabled: boolean;
+  thankyou_message_template: string;
+  thankyou_sent: boolean;
+  thankyou_sent_at: string | null;
+  whatsapp_enabled: boolean;
 }
 
 export type ReservationStatus = 'confirmada' | 'cancelada';
@@ -55,8 +61,8 @@ export interface Reservation {
   id: string;
   product_id: string;
   guest_name: string;
-  guest_email: string;
-  guest_phone: string | null;
+  guest_email: string | null;
+  guest_phone: string;
   qty: number;
   message: string | null;
   status: ReservationStatus;
@@ -65,16 +71,25 @@ export interface Reservation {
   cancelled_by: string | null;
   cancellation_reason: string | null;
   reminder_sent_at: string | null;
-  email_log: EmailLogEntry[];
+  thankyou_sent_at: string | null;
+  activity_log: ActivityLogEntry[];
   ip_hash: string;
   user_agent_hash: string;
 }
 
-export interface EmailLogEntry {
-  type: 'confirmation' | 'admin-notification' | 'reminder' | 'cancellation';
+export type ActivityChannel = 'email' | 'whatsapp';
+export type ActivityType =
+  | 'admin-notification'
+  | 'cancellation'
+  | 'reminder'
+  | 'thankyou';
+
+export interface ActivityLogEntry {
+  channel: ActivityChannel;
+  type: ActivityType;
   sent_at: string;
-  resend_message_id: string | null;
   to: string;
+  provider_message_id: string | null;
   error: string | null;
 }
 
@@ -91,8 +106,7 @@ export interface CreateReservationBody {
   product_id: string;
   qty: number;
   guest_name: string;
-  guest_email: string;
-  guest_phone?: string | null;
+  guest_phone: string;
   message?: string | null;
   hp_url: string;
 }
@@ -123,7 +137,6 @@ export interface AvailabilitySnapshot {
   total_confirmed: number;
   total_desired: number;
   products: Record<string, ProductAvailability>;
-  overlays_active: string[];
 }
 
 export interface WhatsAppLinkResponse {

@@ -1,12 +1,21 @@
 import type { APIRoute } from 'astro';
 import { json, errorResponse, readClientIp } from '~/lib/api';
 import { ReservationCreateSchema } from '~/lib/validation';
-import { getProductById } from '~/lib/products';
-import { getSettings } from '~/lib/settings';
-import { putReservation, getProductCounter, updateProductCounter, checkRateLimit, listReservationsByStatus, listAllReservations } from '~/lib/blobs';
-import { sendGuestConfirmation, sendAdminNotification } from '~/lib/email';
+import { getAllProducts, getProductById } from '~/lib/products';
+import { getRuntimeSettings, markThankYouSent } from '~/lib/settings';
+import {
+  putReservation,
+  getProductCounter,
+  updateProductCounter,
+  checkRateLimit,
+  listReservationsByStatus,
+  listAllReservations,
+  computeTotalProgress,
+} from '~/lib/blobs';
+import { sendAdminNotification } from '~/lib/email';
+import { sendThankYouWhatsApp } from '~/lib/whatsapp';
 import { hashIp } from '~/lib/identity';
-import type { Reservation, CreateReservationResponse } from '~/types/shared';
+import type { Reservation, CreateReservationResponse, ActivityLogEntry } from '~/types/shared';
 
 export const prerender = false;
 
@@ -58,8 +67,8 @@ export const POST: APIRoute = async ({ request }) => {
     id: crypto.randomUUID(),
     product_id: product.id,
     guest_name: input.guest_name,
-    guest_email: input.guest_email,
-    guest_phone: input.guest_phone ?? null,
+    guest_email: null,
+    guest_phone: input.guest_phone,
     qty: input.qty,
     message: input.message ?? null,
     status: 'confirmada',
@@ -68,7 +77,8 @@ export const POST: APIRoute = async ({ request }) => {
     cancelled_by: null,
     cancellation_reason: null,
     reminder_sent_at: null,
-    email_log: [],
+    thankyou_sent_at: null,
+    activity_log: [],
     ip_hash: hashIp(ip),
     user_agent_hash: hashIp(request.headers.get('user-agent') || ''),
   };
@@ -76,19 +86,30 @@ export const POST: APIRoute = async ({ request }) => {
   await putReservation(reservation);
   await updateProductCounter(product.id, product.qty_desejada, input.qty);
 
-  const settings = getSettings();
+  const settings = await getRuntimeSettings();
 
-  // Fire emails (don't block on errors — log in reservation)
-  const [guestEmail, adminEmail] = await Promise.all([
-    sendGuestConfirmation(reservation, product, settings).catch((e) => ({ id: null, error: (e as Error).message })),
-    sendAdminNotification(reservation, product, settings).catch((e) => ({ id: null, error: (e as Error).message })),
-  ]);
-
-  reservation.email_log.push(
-    { type: 'confirmation', sent_at: new Date().toISOString(), resend_message_id: guestEmail.id, to: reservation.guest_email, error: guestEmail.error },
-    { type: 'admin-notification', sent_at: new Date().toISOString(), resend_message_id: adminEmail.id, to: 'admin', error: adminEmail.error }
+  // Notifica Lina por email (canal admin). Não bloqueia em erro — log.
+  const adminEmail = await sendAdminNotification(reservation, product, settings).catch(
+    (e) => ({ id: null, error: (e as Error).message }),
   );
+  reservation.activity_log.push({
+    channel: 'email',
+    type: 'admin-notification',
+    sent_at: new Date().toISOString(),
+    to: 'admin',
+    provider_message_id: adminEmail.id,
+    error: adminEmail.error,
+  });
   await putReservation(reservation);
+
+  // Fire-and-forget: se a lista bateu 100%, dispara agradecimento por
+  // WhatsApp pra TODOS os números únicos confirmados. Idempotente via flag
+  // `thankyou_sent` no settings.
+  if (!settings.thankyou_sent && settings.thankyou_enabled && settings.whatsapp_enabled) {
+    triggerThankYouIfComplete().catch((err) => {
+      console.error('[thankyou] trigger failed:', (err as Error).message);
+    });
+  }
 
   const response: CreateReservationResponse = {
     id: reservation.id,
@@ -121,3 +142,46 @@ export const GET: APIRoute = async ({ request, locals }) => {
 
   return json({ data: filtered }, 200, { 'Cache-Control': 'no-store, private' });
 };
+
+/**
+ * Dispara agradecimento via WhatsApp pra todos os números únicos confirmados,
+ * uma vez só (idempotente via settings.thankyou_sent). Roda em background.
+ */
+async function triggerThankYouIfComplete(): Promise<void> {
+  const settings = await getRuntimeSettings();
+  if (settings.thankyou_sent || !settings.thankyou_enabled || !settings.whatsapp_enabled) return;
+
+  const expected = getAllProducts()
+    .filter((p) => p.active)
+    .map((p) => ({ id: p.id, qty_desejada: p.qty_desejada }));
+  const progress = await computeTotalProgress(expected);
+  if (!progress.complete) return;
+
+  // Re-checa flag depois do trabalho (race window).
+  const fresh = await getRuntimeSettings();
+  if (fresh.thankyou_sent) return;
+
+  await markThankYouSent();
+
+  const all = await listReservationsByStatus('confirmada');
+  const seenPhones = new Set<string>();
+  for (const r of all) {
+    if (!r.guest_phone) continue;
+    if (seenPhones.has(r.guest_phone)) continue;
+    seenPhones.add(r.guest_phone);
+    const result = await sendThankYouWhatsApp(r, fresh);
+    const entry: ActivityLogEntry = {
+      channel: 'whatsapp',
+      type: 'thankyou',
+      sent_at: new Date().toISOString(),
+      to: r.guest_phone,
+      provider_message_id: result.id,
+      error: result.error,
+    };
+    r.activity_log.push(entry);
+    if (!result.error && !result.skipped) {
+      r.thankyou_sent_at = entry.sent_at;
+    }
+    await putReservation(r);
+  }
+}

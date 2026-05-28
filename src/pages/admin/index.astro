@@ -1,6 +1,6 @@
 ---
 import Base from '~/layouts/Base.astro';
-import AdminReservations from '~/components/admin/AdminReservations';
+import AdminPanel from '~/components/admin/AdminPanel';
 import { getAllProducts } from '~/lib/products';
 
 const products = getAllProducts();
@@ -30,7 +30,7 @@ const products = getAllProducts();
   </div>
 
   <div id="admin-panel" class="hidden">
-    <AdminReservations client:load products={products} />
+    <AdminPanel client:load products={products} />
   </div>
 
   <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" is:inline></script>
