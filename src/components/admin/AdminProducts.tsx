@@ -1,8 +1,9 @@
-import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
+import { createSignal, createMemo, createEffect, For, Show, onMount } from 'solid-js';
 import type { Product, Room } from '~/types/shared';
 import { ROOMS, ROOM_LABELS } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
 import { formatBRL } from '~/lib/format';
+import { applyBRLMask, formatCentsAsBRL, parseBRLToCents, PRICE_BRL_INPUT_MAX_LENGTH } from '~/lib/masks';
 import { confirmDialog, toast } from './DialogHost';
 
 interface NewProductDraft {
@@ -24,6 +25,55 @@ const EMPTY_DRAFT: NewProductDraft = {
   room: 'cozinha',
   qty_desejada: 1,
 };
+
+interface PriceInputProps {
+  cents: number | null;
+  placeholder?: string;
+  onCommit: (cents: number | null) => void;
+  class?: string;
+  disabled?: boolean;
+}
+
+/**
+ * Input com máscara BRL. Aplica formatação em tempo real (dígito por
+ * dígito = centavos) e commit no onBlur.
+ */
+function PriceInput(props: PriceInputProps) {
+  const [text, setText] = createSignal(props.cents === null ? '' : formatCentsAsBRL(props.cents));
+
+  // Re-sync quando o produto é atualizado (saving completou em outro lugar)
+  createEffect(() => {
+    const next = props.cents === null ? '' : formatCentsAsBRL(props.cents);
+    setText(next);
+  });
+
+  function onInput(e: InputEvent & { currentTarget: HTMLInputElement }) {
+    const masked = applyBRLMask(e.currentTarget.value);
+    setText(masked);
+  }
+
+  function onBlur() {
+    const cents = parseBRLToCents(text());
+    if (cents !== props.cents) props.onCommit(cents);
+  }
+
+  return (
+    <div class="relative">
+      <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-ink-3 font-semibold pointer-events-none">R$</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={PRICE_BRL_INPUT_MAX_LENGTH}
+        value={text()}
+        placeholder={props.placeholder ?? 'a combinar'}
+        onInput={onInput}
+        onBlur={onBlur}
+        disabled={props.disabled}
+        class={props.class ?? 'w-full h-9 pl-8 pr-3 bg-line-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition'}
+      />
+    </div>
+  );
+}
 
 export default function AdminProducts() {
   const [products, setProducts] = createSignal<Product[]>([]);
@@ -190,20 +240,6 @@ export default function AdminProducts() {
     }
   }
 
-  function parsePriceInput(raw: string): number | null {
-    const trimmed = raw.trim();
-    if (!trimmed) return null;
-    const cleaned = trimmed.replace(/\./g, '').replace(',', '.');
-    const n = Number(cleaned);
-    if (!isFinite(n) || n < 0) return null;
-    return Math.round(n * 100);
-  }
-
-  function formatPriceForInput(cents: number | null): string {
-    if (cents === null) return '';
-    return (cents / 100).toFixed(2).replace('.', ',');
-  }
-
   return (
     <div class="max-w-6xl mx-auto px-5 lg:px-8 py-5 lg:py-7 space-y-5">
       {/* Header */}
@@ -297,6 +333,7 @@ export default function AdminProducts() {
                     />
                     <input
                       type="url"
+                      maxLength={500}
                       value={p.amazon_url}
                       placeholder="https://www.amazon.com.br/dp/..."
                       onChange={(e) => {
@@ -310,16 +347,10 @@ export default function AdminProducts() {
 
                 <div class="grid grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-4 lg:items-end">
                   <div>
-                    <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">Preço (R$)</label>
-                    <input
-                      type="text"
-                      value={formatPriceForInput(p.price_brl_cents)}
-                      placeholder="a combinar"
-                      onChange={(e) => {
-                        const cents = parsePriceInput(e.currentTarget.value);
-                        if (cents !== p.price_brl_cents) patchProduct(p.id, { price_brl_cents: cents });
-                      }}
-                      class="w-full h-9 px-3 bg-line-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+                    <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">Preço</label>
+                    <PriceInput
+                      cents={p.price_brl_cents}
+                      onCommit={(cents) => patchProduct(p.id, { price_brl_cents: cents })}
                     />
                   </div>
                   <div>
@@ -414,13 +445,11 @@ export default function AdminProducts() {
 
               <div class="grid grid-cols-2 gap-3">
                 <div>
-                  <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Preço (R$)</label>
-                  <input
-                    type="text"
-                    value={formatPriceForInput(draft().price_brl_cents)}
-                    placeholder="a combinar"
-                    onInput={(e) => updateDraft('price_brl_cents', parsePriceInput(e.currentTarget.value))}
-                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+                  <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Preço</label>
+                  <PriceInput
+                    cents={draft().price_brl_cents}
+                    onCommit={(cents) => updateDraft('price_brl_cents', cents)}
+                    class="w-full h-11 pl-8 pr-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                   />
                 </div>
                 <div>
@@ -440,12 +469,12 @@ export default function AdminProducts() {
 
               <div>
                 <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">URL da Amazon</label>
-                <input type="url" value={draft().amazon_url} onInput={(e) => updateDraft('amazon_url', e.currentTarget.value)} placeholder="https://www.amazon.com.br/dp/..." class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
+                <input type="url" maxLength={500} value={draft().amazon_url} onInput={(e) => updateDraft('amazon_url', e.currentTarget.value)} placeholder="https://www.amazon.com.br/dp/..." class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
               </div>
 
               <div>
                 <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">URL da imagem</label>
-                <input type="url" value={draft().image_url} onInput={(e) => updateDraft('image_url', e.currentTarget.value)} placeholder="https://m.media-amazon.com/..." class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
+                <input type="url" maxLength={500} value={draft().image_url} onInput={(e) => updateDraft('image_url', e.currentTarget.value)} placeholder="https://m.media-amazon.com/..." class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
                 <p class="text-[11px] text-ink-3 mt-1.5">Cole o link da imagem do produto na Amazon (botão direito → "Copiar endereço da imagem").</p>
               </div>
 

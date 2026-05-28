@@ -14,13 +14,15 @@ export const prerender = false;
 
 const RoomEnum = z.enum(['cozinha', 'eletro', 'quarto', 'banheiro', 'lavanderia', 'sala', 'limpeza']);
 
+const MAX_PRICE_CENTS = 99_999_999; // R$ 999.999,99
+
 const PatchSchema = z.object({
   id: z.string().min(1),
   patch: z.object({
     title: z.string().trim().min(1).max(200).optional(),
-    price_brl_cents: z.number().int().min(0).nullable().optional(),
-    amazon_url: z.string().trim().url().optional(),
-    image_url: z.string().trim().url().optional(),
+    price_brl_cents: z.number().int().min(0).max(MAX_PRICE_CENTS).nullable().optional(),
+    amazon_url: z.string().trim().url().max(500).optional(),
+    image_url: z.string().trim().url().max(500).optional(),
     description: z.string().trim().max(500).optional(),
     qty_desejada: z.number().int().min(0).max(1000).optional(),
     order: z.number().int().min(0).max(9999).optional(),
@@ -35,9 +37,9 @@ const DeleteSchema = z.object({ id: z.string().min(1) });
 const CreateSchema = z.object({
   id: z.string().trim().max(80).optional(),
   title: z.string().trim().min(1).max(200),
-  price_brl_cents: z.number().int().min(0).nullable(),
-  amazon_url: z.string().trim().url(),
-  image_url: z.string().trim().url(),
+  price_brl_cents: z.number().int().min(0).max(MAX_PRICE_CENTS).nullable(),
+  amazon_url: z.string().trim().url().max(500),
+  image_url: z.string().trim().url().max(500),
   description: z.string().trim().max(500).default(''),
   room: RoomEnum,
   qty_desejada: z.number().int().min(1).max(1000).default(1),
