@@ -110,6 +110,95 @@ function ImageEditor(props: ImageEditorProps) {
   );
 }
 
+interface QtyStepperProps {
+  value: number;
+  min?: number;
+  max?: number;
+  onCommit: (value: number) => void;
+  disabled?: boolean;
+}
+
+/**
+ * Stepper de quantidade com botões − e +. O input do meio continua
+ * editável (Lina pode selecionar e digitar). Commit no blur do input
+ * ou no click dos botões.
+ */
+function QtyStepper(props: QtyStepperProps) {
+  const min = () => props.min ?? 0;
+  const max = () => props.max ?? 1000;
+  const [text, setText] = createSignal(String(props.value));
+
+  createEffect(() => {
+    setText(String(props.value));
+  });
+
+  function clamp(n: number): number {
+    if (!isFinite(n)) return min();
+    return Math.max(min(), Math.min(max(), Math.round(n)));
+  }
+
+  function commit(n: number) {
+    const v = clamp(n);
+    if (v !== props.value) props.onCommit(v);
+    setText(String(v));
+  }
+
+  function dec() { commit(props.value - 1); }
+  function inc() { commit(props.value + 1); }
+
+  function onInput(e: InputEvent & { currentTarget: HTMLInputElement }) {
+    const cleaned = e.currentTarget.value.replace(/\D/g, '').slice(0, 4);
+    setText(cleaned);
+    e.currentTarget.value = cleaned;
+  }
+
+  function onBlur() {
+    const parsed = parseInt(text(), 10);
+    commit(isFinite(parsed) ? parsed : min());
+  }
+
+  function onKey(e: KeyboardEvent) {
+    if (e.key === 'Enter') (e.currentTarget as HTMLInputElement).blur();
+    if (e.key === 'ArrowUp') { e.preventDefault(); inc(); }
+    if (e.key === 'ArrowDown') { e.preventDefault(); dec(); }
+  }
+
+  return (
+    <div class="flex items-center bg-line-2 rounded-lg overflow-hidden h-9 focus-within:ring-2 focus-within:ring-primary">
+      <button
+        type="button"
+        onClick={dec}
+        disabled={props.disabled || props.value <= min()}
+        class="h-9 w-9 grid place-items-center text-ink-soft hover:text-ink hover:bg-line transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+        aria-label="Diminuir"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+      <input
+        type="text"
+        inputMode="numeric"
+        maxLength={4}
+        value={text()}
+        onInput={onInput}
+        onBlur={onBlur}
+        onKeyDown={onKey}
+        onFocus={(e) => e.currentTarget.select()}
+        disabled={props.disabled}
+        class="flex-1 h-9 px-1 bg-transparent border-0 text-sm font-semibold text-ink text-center focus:outline-none disabled:opacity-50"
+      />
+      <button
+        type="button"
+        onClick={inc}
+        disabled={props.disabled || props.value >= max()}
+        class="h-9 w-9 grid place-items-center text-ink-soft hover:text-ink hover:bg-line transition disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer"
+        aria-label="Aumentar"
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      </button>
+    </div>
+  );
+}
+
 interface PriceInputProps {
   cents: number | null;
   placeholder?: string;
@@ -441,16 +530,11 @@ export default function AdminProducts() {
                   </div>
                   <div>
                     <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1">Qtd desejada</label>
-                    <input
-                      type="number"
+                    <QtyStepper
+                      value={p.qty_desejada}
                       min={0}
                       max={1000}
-                      value={p.qty_desejada}
-                      onChange={(e) => {
-                        const v = parseInt(e.currentTarget.value, 10);
-                        if (isFinite(v) && v !== p.qty_desejada) patchProduct(p.id, { qty_desejada: v });
-                      }}
-                      class="w-full h-9 px-3 bg-line-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+                      onCommit={(v) => patchProduct(p.id, { qty_desejada: v })}
                     />
                   </div>
                   <div class="col-span-2 lg:col-span-1 flex items-center justify-between gap-2 lg:justify-end">
@@ -540,7 +624,12 @@ export default function AdminProducts() {
                 </div>
                 <div>
                   <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Qtd desejada</label>
-                  <input type="number" min={1} max={1000} value={draft().qty_desejada} onInput={(e) => updateDraft('qty_desejada', parseInt(e.currentTarget.value, 10) || 1)} class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition" />
+                  <QtyStepper
+                    value={draft().qty_desejada}
+                    min={1}
+                    max={1000}
+                    onCommit={(v) => updateDraft('qty_desejada', v)}
+                  />
                 </div>
               </div>
 
