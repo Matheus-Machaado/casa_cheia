@@ -6,9 +6,10 @@ interface Props {
   title: string;
   description?: string;
   noindex?: boolean;
+  fullscreen?: boolean;
 }
 
-const { title, description, noindex } = Astro.props;
+const { title, description, noindex, fullscreen } = Astro.props;
 const settings = getSettings();
 const eventDateShort = formatEventDateShort(settings.event_date);
 const defaultDesc = `${settings.splash_subtitle}`;
@@ -32,40 +33,49 @@ const defaultDesc = `${settings.splash_subtitle}`;
     <meta property="og:type" content="website" />
     <meta property="og:image" content="/og-image.png" />
   </head>
-  <body>
+  <body class={fullscreen ? 'is-fullscreen' : ''}>
     <div id="nprogress" class="nprogress-bar"></div>
 
-    <nav class="sticky top-0 z-30 bg-white border-b border-line">
-      <div class="max-w-7xl mx-auto px-4 lg:px-8 h-14 lg:h-16 flex items-center justify-between">
-        <a href="/" class="flex items-center gap-2.5 group">
-          <span class="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-primary text-white grid place-items-center font-display font-semibold text-base lg:text-lg leading-none">L</span>
-          <div class="leading-tight">
-            <div class="font-semibold text-sm lg:text-base text-ink">Casa Cheia</div>
-            <div class="text-[10px] lg:text-[11px] uppercase tracking-wider text-ink-3">chá da {settings.bride_name} · {eventDateShort}</div>
-          </div>
-        </a>
-        <div class="flex items-center gap-1">
-          <a href="/presentes" class="px-3 lg:px-4 h-9 lg:h-10 rounded-full text-sm font-medium text-ink-soft hover:bg-line-2 hover:text-ink transition inline-flex items-center">Presentes</a>
-          <a href="/admin" class="px-3 lg:px-4 h-9 lg:h-10 rounded-full text-sm font-medium text-ink-soft hover:bg-line-2 hover:text-ink transition flex items-center gap-1.5" aria-label="Acesso admin">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <span class="hidden sm:inline">Admin</span>
+    {!fullscreen && (
+      <nav class="sticky top-0 z-30 bg-white border-b border-line">
+        <div class="max-w-7xl mx-auto px-4 lg:px-8 h-14 lg:h-16 flex items-center justify-between">
+          <a href="/" class="flex items-center gap-2.5 group">
+            <span class="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-primary text-white grid place-items-center font-display font-semibold text-base lg:text-lg leading-none">L</span>
+            <div class="leading-tight">
+              <div class="font-semibold text-sm lg:text-base text-ink">Casa Cheia</div>
+              <div class="text-[10px] lg:text-[11px] uppercase tracking-wider text-ink-3">chá da {settings.bride_name} · {eventDateShort}</div>
+            </div>
           </a>
+          <div class="flex items-center gap-1">
+            <a href="/presentes" class="px-3 lg:px-4 h-9 lg:h-10 rounded-full text-sm font-medium text-ink-soft hover:bg-line-2 hover:text-ink transition inline-flex items-center">Presentes</a>
+            <a href="/admin" class="px-3 lg:px-4 h-9 lg:h-10 rounded-full text-sm font-medium text-ink-soft hover:bg-line-2 hover:text-ink transition flex items-center gap-1.5" aria-label="Acesso admin">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <span class="hidden sm:inline">Admin</span>
+            </a>
+          </div>
         </div>
-      </div>
-    </nav>
+      </nav>
+    )}
 
     <main>
       <slot />
     </main>
 
-    <footer class="bg-white border-t border-line py-8 mt-12">
-      <div class="max-w-7xl mx-auto px-5 lg:px-8 flex flex-col lg:flex-row items-center justify-between gap-3">
-        <div class="flex items-center gap-2 text-sm text-ink-3">
-          <span class="font-semibold text-ink">Casa Cheia</span> · feito com carinho pra {settings.bride_name}
+    {!fullscreen && (
+      <footer class="bg-white border-t border-line py-8 mt-12">
+        <div class="max-w-7xl mx-auto px-5 lg:px-8 flex flex-col lg:flex-row items-center justify-between gap-3">
+          <div class="flex items-center gap-2 text-sm text-ink-3">
+            <span class="font-semibold text-ink">Casa Cheia</span> · feito com carinho pra {settings.bride_name}
+          </div>
+          <div class="text-xs text-ink-3">{eventDateShort} {settings.event_date.slice(0, 4)} · {settings.event_time} · {settings.event_address}</div>
         </div>
-        <div class="text-xs text-ink-3">{eventDateShort} {settings.event_date.slice(0, 4)} · {settings.event_time} · {settings.event_address}</div>
-      </div>
-    </footer>
+      </footer>
+    )}
+
+    <style>
+      body.is-fullscreen { margin: 0; }
+      body.is-fullscreen > main { display: block; }
+    </style>
 
     <script>
       // Global progress bar pra navegação client-side
