@@ -1,6 +1,5 @@
 import { createSignal, createMemo, Show, onMount, onCleanup } from 'solid-js';
 import type { Product, ProductAvailability } from '~/types/shared';
-import { formatBRL } from '~/lib/format';
 
 interface Props {
   product: Product;
@@ -115,10 +114,11 @@ export default function ProductModal(props: Props) {
           {/* Info */}
           <div>
             <h2 class="text-xl lg:text-2xl font-bold text-ink tracking-tight leading-snug">{props.product.title}</h2>
-            <div class="mt-2 flex items-baseline gap-2">
-              <span class="text-2xl font-bold text-ink">{formatBRL(props.product.price_brl_cents)}</span>
-            </div>
-            <p class="mt-3 text-sm text-ink-soft leading-relaxed">{props.product.description}</p>
+            <p class="mt-2 text-sm text-ink-soft leading-relaxed">{props.product.description}</p>
+            <a href={props.product.amazon_url} target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex items-center gap-1.5 text-xs text-ink-3 hover:text-ink font-medium transition">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+              Ver preço atual na Amazon
+            </a>
           </div>
 
           {/* Form ou estado esgotado */}
@@ -167,7 +167,6 @@ export default function ProductModal(props: Props) {
                 </Show>
               </button>
 
-              <a href={props.product.amazon_url} target="_blank" rel="noopener noreferrer" class="text-center text-xs text-ink-3 hover:text-ink underline underline-offset-4 mt-1">Ver na Amazon antes</a>
             </form>
           </Show>
         </div>
