@@ -12,15 +12,3 @@ export function getProductById(id: string): Product | undefined {
 export function getProductsByRoom(room: Room): Product[] {
   return getAllProducts().filter((p) => p.room === room);
 }
-
-export function getProductsByOverlay(overlay_id: string): Product[] {
-  return getAllProducts().filter((p) => p.overlay_id === overlay_id);
-}
-
-export function getAllOverlayIds(): string[] {
-  const ids = new Set<string>();
-  for (const p of getAllProducts()) {
-    if (p.overlay_id) ids.add(p.overlay_id);
-  }
-  return [...ids];
-}

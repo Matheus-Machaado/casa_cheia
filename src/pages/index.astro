@@ -11,7 +11,7 @@ const eventDateLong = formatEventDate(settings.event_date);
 
   <!-- HERO MOBILE: scene full-bleed top, text below -->
   <section class="lg:hidden">
-    <div class="relative bg-white" style="height: 60vh; min-height: 480px;">
+    <div class="relative aspect-[864/1085] bg-white max-h-[65vh] mx-auto" style="width: min(100%, calc(65vh * 864 / 1085));">
       <HeroScene client:load brideName={settings.bride_name} />
     </div>
 
@@ -88,7 +88,7 @@ const eventDateLong = formatEventDate(settings.event_date);
       </div>
 
       <div class="col-span-7 relative">
-        <div class="relative aspect-[5/4] bg-white rounded-3xl shadow-md border border-line overflow-hidden">
+        <div class="relative aspect-[864/1085] bg-white rounded-3xl shadow-md border border-line overflow-hidden">
           <HeroScene client:load brideName={settings.bride_name} />
         </div>
       </div>

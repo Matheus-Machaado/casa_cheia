@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Compare before vs master</title>
+<style>
+  body { background: #fafafa; font-family: system-ui; padding: 20px; }
+  h2 { margin: 8px 0; }
+  .row { display: flex; gap: 20px; flex-wrap: wrap; }
+  .box { width: 400px; }
+  .container { position: relative; aspect-ratio: 7/9; background: #eee; overflow: hidden; border: 1px solid #ccc; }
+  .container img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: center bottom; }
+  .overlay-50 { opacity: 0.5; }
+  .label { font-size: 12px; color: #666; margin-top: 4px; }
+  input[type=range] { width: 100%; }
+</style>
+</head>
+<body>
+  <h1>Alignment check — before vs master</h1>
+
+  <div class="row">
+    <div class="box">
+      <h2>Before sozinho</h2>
+      <div class="container">
+        <img src="before.png" />
+      </div>
+      <div class="label">896 × 1152</div>
+    </div>
+
+    <div class="box">
+      <h2>Master sozinho</h2>
+      <div class="container">
+        <img src="master.png" />
+      </div>
+      <div class="label">864 × 1085</div>
+    </div>
+
+    <div class="box">
+      <h2>Sobreposição (master @ 50% opacity)</h2>
+      <div class="container">
+        <img src="before.png" />
+        <img src="master.png" class="overlay-50" id="master-overlay" />
+      </div>
+      <div class="label">Se Lina alinha = OK. Se "fantasma" = precisa ajustar.</div>
+      <input type="range" id="alpha" min="0" max="100" value="50" />
+      <input type="range" id="offsetX" min="-100" max="100" value="0" />
+      <input type="range" id="offsetY" min="-100" max="100" value="0" />
+      <input type="range" id="scale" min="80" max="120" value="100" />
+      <div class="label">alpha · offsetX (px) · offsetY (px) · scale (%)</div>
+    </div>
+  </div>
+
+  <script>
+    const overlay = document.getElementById('master-overlay');
+    const alpha = document.getElementById('alpha');
+    const offX = document.getElementById('offsetX');
+    const offY = document.getElementById('offsetY');
+    const scale = document.getElementById('scale');
+    function update() {
+      overlay.style.opacity = alpha.value / 100;
+      overlay.style.transform = `translate(${offX.value}px, ${offY.value}px) scale(${scale.value / 100})`;
+    }
+    [alpha, offX, offY, scale].forEach(el => el.addEventListener('input', update));
+  </script>
+</body>
+</html>

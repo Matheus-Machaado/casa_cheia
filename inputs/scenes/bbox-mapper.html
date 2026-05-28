@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Bbox mapper — master.png</title>
+<style>
+  body { background: #111; color: #eee; font-family: monospace; margin: 0; }
+  .wrap { display: grid; grid-template-columns: 1fr 360px; gap: 0; min-height: 100vh; }
+  .canvas-wrap { position: relative; padding: 12px; }
+  #canvas { position: relative; width: 100%; max-width: 800px; margin: 0 auto; }
+  #canvas img { width: 100%; height: auto; display: block; }
+  #canvas .box { position: absolute; border: 2px solid #F43F5E; background: rgba(244,63,94,0.15); cursor: move; }
+  #canvas .box.active { border-color: #FACC15; background: rgba(250,204,21,0.25); }
+  #canvas .box .label { position: absolute; top: -22px; left: 0; background: #F43F5E; color: white; padding: 1px 6px; font-size: 11px; border-radius: 3px; white-space: nowrap; }
+  #canvas .box.active .label { background: #FACC15; color: #111; }
+  .panel { background: #1a1a1a; padding: 12px; overflow-y: auto; max-height: 100vh; font-size: 12px; }
+  .panel h2 { margin: 0 0 8px; font-size: 13px; }
+  .row { display: flex; gap: 4px; margin-bottom: 4px; }
+  .row input { background: #222; color: #eee; border: 1px solid #333; padding: 4px; font-family: inherit; font-size: 11px; width: 70px; }
+  .row input.id { width: 140px; }
+  button { background: #F43F5E; color: white; border: 0; padding: 6px 10px; cursor: pointer; font-family: inherit; border-radius: 3px; }
+  button.ghost { background: #222; }
+  pre { background: #000; padding: 10px; overflow-x: auto; font-size: 10px; }
+  .controls { display: flex; gap: 6px; margin: 8px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="canvas-wrap">
+    <div id="canvas">
+      <img src="master.png" id="img" />
+    </div>
+  </div>
+  <div class="panel">
+    <h2>BBox mapper</h2>
+    <p>Clica + arrasta na imagem pra criar uma box. Edita os valores nos inputs. Cada box = uma região revelável.</p>
+    <div class="controls">
+      <button onclick="addBox()">+ box</button>
+      <button class="ghost" onclick="clearAll()">limpar</button>
+      <button class="ghost" onclick="exportJson()">copy JSON</button>
+    </div>
+    <div id="list"></div>
+    <h2 style="margin-top:16px;">JSON</h2>
+    <pre id="json"></pre>
+  </div>
+</div>
+
+<script>
+  let boxes = [];
+  let activeIdx = -1;
+  const canvas = document.getElementById('canvas');
+  const img = document.getElementById('img');
+
+  function render() {
+    canvas.querySelectorAll('.box').forEach(el => el.remove());
+    boxes.forEach((b, i) => {
+      const el = document.createElement('div');
+      el.className = 'box' + (i === activeIdx ? ' active' : '');
+      el.style.left = b.x + '%';
+      el.style.top = b.y + '%';
+      el.style.width = b.w + '%';
+      el.style.height = b.h + '%';
+      el.innerHTML = `<div class="label">${b.id || 'untitled'}</div>`;
+      el.addEventListener('mousedown', (e) => {
+        if (e.target.classList.contains('label')) return;
+        activeIdx = i;
+        startDrag(e, b);
+        render();
+      });
+      canvas.appendChild(el);
+    });
+    renderList();
+    renderJson();
+  }
+
+  function renderList() {
+    const list = document.getElementById('list');
+    list.innerHTML = boxes.map((b, i) => `
+      <div class="row">
+        <input class="id" value="${b.id}" oninput="boxes[${i}].id=this.value; updateJson()" />
+        <input value="${b.x.toFixed(1)}" oninput="boxes[${i}].x=parseFloat(this.value); render()" />
+        <input value="${b.y.toFixed(1)}" oninput="boxes[${i}].y=parseFloat(this.value); render()" />
+        <input value="${b.w.toFixed(1)}" oninput="boxes[${i}].w=parseFloat(this.value); render()" />
+        <input value="${b.h.toFixed(1)}" oninput="boxes[${i}].h=parseFloat(this.value); render()" />
+        <button class="ghost" onclick="boxes.splice(${i},1); render();">x</button>
+      </div>
+    `).join('') + '<div class="row" style="color:#666;font-size:10px;"><div class="id">id</div><div style="width:70px">x%</div><div style="width:70px">y%</div><div style="width:70px">w%</div><div style="width:70px">h%</div></div>';
+  }
+
+  function renderJson() {
+    document.getElementById('json').textContent = JSON.stringify(boxes.map(({id,x,y,w,h}) => ({id, x:+x.toFixed(1), y:+y.toFixed(1), w:+w.toFixed(1), h:+h.toFixed(1)})), null, 2);
+  }
+  function updateJson() { renderJson(); }
+
+  function addBox() {
+    boxes.push({ id: 'cluster-' + (boxes.length + 1), x: 30, y: 30, w: 20, h: 15 });
+    activeIdx = boxes.length - 1;
+    render();
+  }
+  function clearAll() { boxes = []; activeIdx = -1; render(); }
+  function exportJson() {
+    const text = document.getElementById('json').textContent;
+    navigator.clipboard.writeText(text);
+    alert('JSON copiado!');
+  }
+
+  // Click + drag pra criar box nova
+  let creating = null;
+  img.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    creating = { id: 'cluster-' + (boxes.length + 1), x, y, w: 0, h: 0, startX: x, startY: y };
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (!creating) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    creating.x = Math.min(creating.startX, x);
+    creating.y = Math.min(creating.startY, y);
+    creating.w = Math.abs(x - creating.startX);
+    creating.h = Math.abs(y - creating.startY);
+    if (boxes.length && boxes[boxes.length-1] === creating) boxes.pop();
+    boxes.push(creating);
+    render();
+  });
+  document.addEventListener('mouseup', () => {
+    if (creating && creating.w > 1 && creating.h > 1) {
+      activeIdx = boxes.length - 1;
+    } else if (creating) {
+      boxes.pop();
+    }
+    creating = null;
+    render();
+  });
+
+  // Drag existing
+  function startDrag(e, b) {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const startX = ((e.clientX - rect.left) / rect.width) * 100;
+    const startY = ((e.clientY - rect.top) / rect.height) * 100;
+    const ox = b.x, oy = b.y;
+    const onMove = (ev) => {
+      const cx = ((ev.clientX - rect.left) / rect.width) * 100;
+      const cy = ((ev.clientY - rect.top) / rect.height) * 100;
+      b.x = ox + (cx - startX);
+      b.y = oy + (cy - startY);
+      render();
+    };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }
+
+  render();
+</script>
+</body>
+</html>
