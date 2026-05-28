@@ -26,6 +26,90 @@ const EMPTY_DRAFT: NewProductDraft = {
   qty_desejada: 1,
 };
 
+/**
+ * Faz upload de um arquivo de imagem e retorna a URL pública.
+ */
+async function uploadImage(file: File): Promise<string | null> {
+  if (file.size > 5 * 1024 * 1024) {
+    toast('Imagem muito grande (máx 5MB)', 'err');
+    return null;
+  }
+  if (!file.type.startsWith('image/')) {
+    toast('Arquivo precisa ser uma imagem', 'err');
+    return null;
+  }
+  const fd = new FormData();
+  fd.append('file', file);
+  try {
+    const res = await authFetch('/api/admin/upload', {
+      method: 'POST',
+      body: fd,
+    });
+    const body = await res.json() as { data?: { url: string }; error?: { message: string } };
+    if (!res.ok || !body.data) {
+      toast(body.error?.message ?? 'Erro no upload', 'err');
+      return null;
+    }
+    return body.data.url;
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg !== 'session-expired') toast(msg, 'err');
+    return null;
+  }
+}
+
+interface ImageEditorProps {
+  url: string;
+  alt: string;
+  onChange: (url: string) => void;
+  size?: 'sm' | 'lg';
+}
+
+function ImageEditor(props: ImageEditorProps) {
+  const [uploading, setUploading] = createSignal(false);
+  let fileInput: HTMLInputElement | undefined;
+
+  async function handleFile(e: Event) {
+    const target = e.currentTarget as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    const url = await uploadImage(file);
+    setUploading(false);
+    if (url) {
+      props.onChange(url);
+      toast('Imagem atualizada', 'ok', 1500);
+    }
+    if (fileInput) fileInput.value = '';
+  }
+
+  const dim = () => (props.size === 'lg' ? 'w-24 h-24' : 'w-16 h-16');
+
+  return (
+    <div class={`${dim()} relative rounded-xl bg-line-2 grid place-items-center overflow-hidden shrink-0 group cursor-pointer`} onClick={() => fileInput?.click()} title="Clique pra trocar a imagem">
+      <Show when={props.url} fallback={
+        <div class="text-[10px] text-ink-3 text-center px-1">sem imagem</div>
+      }>
+        <img src={props.url} alt={props.alt} class="max-w-full max-h-full object-contain p-1.5" onError={(e) => (e.currentTarget.style.display = 'none')} />
+      </Show>
+      <div class="absolute inset-0 bg-ink/70 grid place-items-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <Show when={!uploading()} fallback={
+          <div class="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        }>
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </Show>
+      </div>
+      <input
+        ref={(el) => (fileInput = el)}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif"
+        onChange={handleFile}
+        class="hidden"
+      />
+    </div>
+  );
+}
+
 interface PriceInputProps {
   cents: number | null;
   placeholder?: string;
@@ -312,9 +396,11 @@ export default function AdminProducts() {
             <div class={`bg-white border border-line rounded-2xl p-4 ${!p.active ? 'opacity-60' : ''} ${savingId() === p.id ? 'ring-2 ring-primary/50' : ''} transition`}>
               <div class="flex flex-col lg:flex-row gap-4">
                 <div class="flex items-start gap-3 flex-1 min-w-0">
-                  <div class="w-16 h-16 rounded-xl bg-line-2 grid place-items-center overflow-hidden shrink-0">
-                    <img src={p.image_url} alt={p.title} class="max-w-full max-h-full object-contain p-1.5" onError={(e) => (e.currentTarget.style.display = 'none')} />
-                  </div>
+                  <ImageEditor
+                    url={p.image_url}
+                    alt={p.title}
+                    onChange={(url) => patchProduct(p.id, { image_url: url })}
+                  />
                   <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2 mb-1">
                       <span class="text-[10px] uppercase tracking-wider text-ink-3 font-bold">{ROOM_LABELS[p.room]}</span>
@@ -473,9 +559,19 @@ export default function AdminProducts() {
               </div>
 
               <div>
-                <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">URL da imagem</label>
-                <input type="url" maxLength={500} value={draft().image_url} onInput={(e) => updateDraft('image_url', e.currentTarget.value)} placeholder="https://m.media-amazon.com/..." class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
-                <p class="text-[11px] text-ink-3 mt-1.5">Cole o link da imagem do produto na Amazon (botão direito → "Copiar endereço da imagem").</p>
+                <label class="block text-[10px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">Imagem</label>
+                <div class="flex items-start gap-3">
+                  <ImageEditor
+                    url={draft().image_url}
+                    alt="Pré-visualização"
+                    onChange={(url) => updateDraft('image_url', url)}
+                    size="lg"
+                  />
+                  <div class="flex-1 min-w-0">
+                    <input type="url" maxLength={500} value={draft().image_url} onInput={(e) => updateDraft('image_url', e.currentTarget.value)} placeholder="https://m.media-amazon.com/... ou faça upload no quadrinho" class="w-full h-10 px-3 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition font-mono" />
+                    <p class="text-[11px] text-ink-3 mt-1.5">Clique no quadrinho à esquerda pra fazer upload de uma foto sua, ou cole a URL da imagem da Amazon.</p>
+                  </div>
+                </div>
               </div>
 
               <div>
