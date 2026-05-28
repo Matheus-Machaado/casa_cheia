@@ -1,9 +1,15 @@
 import { z } from 'zod';
 
+const PHONE_BR_PATTERN = /^\(\d{2}\)\s\d{4,5}-\d{4}$/;
+
 export const ReservationCreateSchema = z.object({
   product_id: z.string().min(1).max(80),
   qty: z.number().int().min(1).max(20),
   guest_name: z.string().trim().min(2).max(80),
+  guest_phone: z.string().trim().regex(PHONE_BR_PATTERN, {
+    message: 'Telefone no formato (11) 99999-9999',
+  }).nullable().optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
   hp_url: z.string().max(0, 'Honeypot tripped'),
 });
 

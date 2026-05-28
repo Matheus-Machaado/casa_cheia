@@ -1,8 +1,9 @@
-import { createSignal, onMount, Show, For } from 'solid-js';
+import { onMount, Show, For } from 'solid-js';
 import type { Settings } from '~/types/shared';
 import { authFetch, isLoggedIn } from '~/lib/auth';
 import { applyCEPMask, parseCEPDigits, CEP_INPUT_MAX_LENGTH } from '~/lib/masks';
 import { toast } from './DialogHost';
+import { draftSettings, loadPristineSettings, updateSettingsPatch, patchSettingsBulk, getPristineSettings } from './draftStore';
 
 interface ViaCepResponse {
   cep?: string;
@@ -35,7 +36,7 @@ const PLACEHOLDER_DOCS: Array<{ key: string; example: string }> = [
   { key: '{data}', example: 'Data formatada (ex: 15 de abril, 2026)' },
   { key: '{hora}', example: 'Horário do chá (ex: 14:00)' },
   { key: '{endereco}', example: 'Endereço do chá' },
-  { key: '{bride}', example: 'Nome da Lina' },
+  { key: '{bride}', example: 'Nome da homenageada' },
 ];
 
 const SECTIONS: Array<{ key: keyof Settings; title: string; subtitle: string; rows: number }> = [
@@ -60,85 +61,41 @@ const SECTIONS: Array<{ key: keyof Settings; title: string; subtitle: string; ro
 ];
 
 export default function AdminSettings() {
-  const [settings, setSettings] = createSignal<Settings | null>(null);
-  const [loading, setLoading] = createSignal(true);
-  const [saving, setSaving] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
-  const [success, setSuccess] = createSignal<string | null>(null);
-
   async function load() {
-    if (!isLoggedIn()) { setLoading(false); return; }
-    setLoading(true);
-    setError(null);
+    if (!isLoggedIn()) return;
+    if (getPristineSettings()) return; // já carregado
     try {
       const res = await authFetch('/api/admin/settings');
-      const body = (await res.json()) as { data?: { settings: Settings }; error?: { message: string } };
-      if (!res.ok || !body.data) {
-        setError(body.error?.message ?? 'Erro ao carregar');
-        return;
+      const body = await res.json() as { data?: { settings: Settings }; error?: { message: string } };
+      if (res.ok && body.data) {
+        loadPristineSettings(body.data.settings);
+      } else {
+        toast(body.error?.message ?? 'Erro ao carregar configurações', 'err');
       }
-      setSettings(body.data.settings);
     } catch (e) {
       const msg = (e as Error).message;
-      if (msg !== 'session-expired') setError(msg);
-    } finally {
-      setLoading(false);
+      if (msg !== 'session-expired') toast(msg, 'err');
     }
   }
 
   onMount(load);
 
-  async function save(patch: Partial<Settings>) {
-    setSaving(true);
-    setError(null);
-    setSuccess(null);
-    try {
-      const res = await authFetch('/api/admin/settings', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(patch),
-      });
-      const body = (await res.json()) as { data?: Settings; error?: { message: string } };
-      if (!res.ok || !body.data) {
-        setError(body.error?.message ?? 'Erro ao salvar');
-        return;
-      }
-      setSettings(body.data);
-      setSuccess('Salvo ✓');
-      setTimeout(() => setSuccess(null), 2000);
-    } catch (e) {
-      setError((e as Error).message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
   function update<K extends keyof Settings>(key: K, value: Settings[K]) {
-    const s = settings();
-    if (!s) return;
-    setSettings({ ...s, [key]: value });
+    updateSettingsPatch(key, value);
   }
 
   return (
     <div class="max-w-3xl mx-auto px-5 lg:px-8 py-5 lg:py-7 space-y-6">
-      <Show when={loading()}>
+      <Show when={!draftSettings()}>
         <div class="text-center py-10 text-ink-3 text-sm">Carregando…</div>
       </Show>
 
-      <Show when={error()}>
-        <div class="bg-danger-s text-danger text-sm rounded-lg px-4 py-3">{error()}</div>
-      </Show>
-
-      <Show when={success()}>
-        <div class="bg-success-s text-success text-sm rounded-lg px-4 py-3 sticky top-4">{success()}</div>
-      </Show>
-
-      <Show when={settings()}>
+      <Show when={draftSettings()}>
         {(s) => (
           <>
             <section class="bg-white border border-line rounded-2xl p-5 lg:p-6">
               <h2 class="text-lg font-bold text-ink tracking-tight">Dados do chá</h2>
-              <p class="text-sm text-ink-soft mt-0.5 mb-4">Aparecem na home, nas mensagens e no convite. Atualizam o site em até 30s depois do save.</p>
+              <p class="text-sm text-ink-soft mt-0.5 mb-4">Aparecem na home, nas mensagens e no convite. Clique em <strong>Publicar</strong> no topo pra subir as mudanças.</p>
 
               <div class="space-y-4">
                 <div>
@@ -148,9 +105,7 @@ export default function AdminSettings() {
                     maxLength={80}
                     value={s().bride_name}
                     onInput={(e) => update('bride_name', e.currentTarget.value)}
-                    onBlur={() => save({ bride_name: s().bride_name })}
-                    disabled={saving()}
-                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                   />
                 </div>
 
@@ -162,10 +117,9 @@ export default function AdminSettings() {
                       value={s().event_date}
                       onChange={(e) => {
                         const v = e.currentTarget.value;
-                        if (v) save({ event_date: v });
+                        if (v) update('event_date', v);
                       }}
-                      disabled={saving()}
-                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                     />
                   </div>
                   <div>
@@ -175,10 +129,9 @@ export default function AdminSettings() {
                       value={s().event_time}
                       onChange={(e) => {
                         const v = e.currentTarget.value;
-                        if (v) save({ event_time: v });
+                        if (v) update('event_time', v);
                       }}
-                      disabled={saving()}
-                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                      class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                     />
                   </div>
                 </div>
@@ -204,28 +157,25 @@ export default function AdminSettings() {
                         onBlur={async (e) => {
                           const digits = parseCEPDigits(e.currentTarget.value);
                           if (digits.length === 8 && digits !== s().event_cep) {
+                            update('event_cep', digits);
+                          }
+                          if (digits.length === 8) {
                             const found = await fetchCEP(digits);
                             if (found) {
-                              const patch: Partial<Settings> = {
+                              patchSettingsBulk({
                                 event_cep: digits,
                                 event_street: found.logradouro || s().event_street,
                                 event_neighborhood: found.bairro || s().event_neighborhood,
                                 event_city: found.localidade || s().event_city,
                                 event_state: (found.uf || s().event_state).toUpperCase(),
-                              };
-                              setSettings({ ...s(), ...patch });
-                              save(patch);
+                              });
                               toast('Endereço preenchido pelo CEP', 'ok', 2000);
                             } else {
                               toast('CEP não encontrado — preenche o resto manualmente', 'warn', 3000);
-                              save({ event_cep: digits });
                             }
-                          } else if (digits.length === 8) {
-                            save({ event_cep: digits });
                           }
                         }}
-                        disabled={saving()}
-                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                       <p class="text-[10px] text-ink-3 mt-1">Digita o CEP e os campos preenchem sozinhos.</p>
                     </div>
@@ -236,10 +186,8 @@ export default function AdminSettings() {
                         maxLength={120}
                         value={s().event_street}
                         onInput={(e) => update('event_street', e.currentTarget.value)}
-                        onBlur={() => save({ event_street: s().event_street })}
-                        disabled={saving()}
                         placeholder="Av. Brasil"
-                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                     </div>
                   </div>
@@ -252,10 +200,8 @@ export default function AdminSettings() {
                         maxLength={20}
                         value={s().event_number}
                         onInput={(e) => update('event_number', e.currentTarget.value)}
-                        onBlur={() => save({ event_number: s().event_number })}
-                        disabled={saving()}
                         placeholder="123"
-                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                     </div>
                     <div>
@@ -265,10 +211,8 @@ export default function AdminSettings() {
                         maxLength={80}
                         value={s().event_complement}
                         onInput={(e) => update('event_complement', e.currentTarget.value)}
-                        onBlur={() => save({ event_complement: s().event_complement })}
-                        disabled={saving()}
                         placeholder="apto 42 / bloco B"
-                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                     </div>
                   </div>
@@ -280,10 +224,8 @@ export default function AdminSettings() {
                       maxLength={80}
                       value={s().event_neighborhood}
                       onInput={(e) => update('event_neighborhood', e.currentTarget.value)}
-                      onBlur={() => save({ event_neighborhood: s().event_neighborhood })}
-                      disabled={saving()}
                       placeholder="Centro"
-                      class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                      class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                     />
                   </div>
 
@@ -295,10 +237,8 @@ export default function AdminSettings() {
                         maxLength={80}
                         value={s().event_city}
                         onInput={(e) => update('event_city', e.currentTarget.value)}
-                        onBlur={() => save({ event_city: s().event_city })}
-                        disabled={saving()}
                         placeholder="São Paulo"
-                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-full h-11 px-3.5 bg-white border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                     </div>
                     <div>
@@ -308,10 +248,8 @@ export default function AdminSettings() {
                         maxLength={2}
                         value={s().event_state}
                         onInput={(e) => update('event_state', e.currentTarget.value.toUpperCase().replace(/[^A-Z]/g, '').slice(0, 2))}
-                        onBlur={() => save({ event_state: s().event_state })}
-                        disabled={saving()}
                         placeholder="SP"
-                        class="w-20 h-11 px-3.5 bg-white border-0 rounded-xl text-sm font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-primary transition disabled:opacity-60"
+                        class="w-20 h-11 px-3.5 bg-white border-0 rounded-xl text-sm font-bold text-center uppercase focus:outline-none focus:ring-2 focus:ring-primary transition"
                       />
                     </div>
                   </div>
@@ -330,10 +268,8 @@ export default function AdminSettings() {
                     maxLength={120}
                     value={s().splash_title}
                     onInput={(e) => update('splash_title', e.currentTarget.value)}
-                    onBlur={() => save({ splash_title: s().splash_title })}
-                    disabled={saving()}
                     placeholder="Ajude a Lina a deixar o apê cheinho."
-                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60"
+                    class="w-full h-11 px-3.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                   />
                 </div>
 
@@ -344,10 +280,8 @@ export default function AdminSettings() {
                     maxLength={240}
                     value={s().splash_subtitle}
                     onInput={(e) => update('splash_subtitle', e.currentTarget.value)}
-                    onBlur={() => save({ splash_subtitle: s().splash_subtitle })}
-                    disabled={saving()}
                     placeholder="Escolhe um presentinho lá embaixo. A cada item, a casa fica mais cheia — e a Lina mais feliz."
-                    class="w-full px-3.5 py-2.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition disabled:opacity-60 resize-none"
+                    class="w-full px-3.5 py-2.5 bg-line-2 border-0 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition resize-none"
                   />
                 </div>
               </div>
@@ -367,11 +301,8 @@ export default function AdminSettings() {
                     rows={sec.rows}
                     value={s()[sec.key] as string}
                     onInput={(e) => update(sec.key, e.currentTarget.value as never)}
-                    onBlur={() => save({ [sec.key]: s()[sec.key] } as Partial<Settings>)}
-                    disabled={saving()}
-                    class="w-full px-4 py-3 bg-line-2 border-0 rounded-xl text-[14px] font-mono focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition resize-none disabled:opacity-60"
+                    class="w-full px-4 py-3 bg-line-2 border-0 rounded-xl text-[14px] font-mono focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition resize-none"
                   />
-                  <p class="text-[11px] text-ink-3 mt-1.5">Salva quando você sai do campo.</p>
                 </section>
               )}
             </For>

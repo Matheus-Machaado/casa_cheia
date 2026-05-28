@@ -67,7 +67,7 @@ export const POST: APIRoute = async ({ request }) => {
     product_id: product.id,
     guest_name: input.guest_name,
     guest_email: null,
-    guest_phone: null,
+    guest_phone: input.guest_phone ?? null,
     qty: input.qty,
     message: null,
     status: 'confirmada',

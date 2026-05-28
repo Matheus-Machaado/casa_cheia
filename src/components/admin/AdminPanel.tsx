@@ -1,10 +1,11 @@
-import { createSignal, Show, onMount } from 'solid-js';
+import { createSignal, Show, onMount, onCleanup } from 'solid-js';
 import type { Product } from '~/types/shared';
 import AdminReservations from './AdminReservations';
 import AdminSettings from './AdminSettings';
 import AdminProducts from './AdminProducts';
-import DialogHost from './DialogHost';
+import DialogHost, { confirmDialog, toast } from './DialogHost';
 import { currentUser, logout } from '~/lib/auth';
+import { hasPendingChanges, pendingCount, describePending, publishAll, discardAll } from './draftStore';
 
 interface Props {
   products: Product[];
@@ -15,15 +16,71 @@ type Tab = 'reservas' | 'produtos' | 'configuracoes';
 export default function AdminPanel(props: Props) {
   const [tab, setTab] = createSignal<Tab>('reservas');
   const [userEmail, setUserEmail] = createSignal('');
+  const [publishing, setPublishing] = createSignal(false);
 
   onMount(() => {
     const u = currentUser();
     if (u) setUserEmail(u.email);
+
+    const beforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasPendingChanges()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', beforeUnload);
+    onCleanup(() => window.removeEventListener('beforeunload', beforeUnload));
   });
 
-  function handleLogout() {
+  async function handleLogout() {
+    if (hasPendingChanges()) {
+      const ok = await confirmDialog({
+        title: 'Sair sem publicar?',
+        body: 'Você tem alterações no rascunho que serão perdidas se sair agora.',
+        ok: 'Sair mesmo assim',
+        cancel: 'Voltar',
+        danger: true,
+      });
+      if (!ok) return;
+    }
     logout();
     window.location.reload();
+  }
+
+  async function handlePublish() {
+    if (!hasPendingChanges() || publishing()) return;
+    setPublishing(true);
+    try {
+      const result = await publishAll();
+      if (result.ok) {
+        toast('Tudo publicado ✓ — alterações no ar em até 30s', 'ok', 4000);
+      } else if (result.errors.length > 0) {
+        toast(`Publicação parcial — ${result.errors.length} erro(s). Veja console.`, 'err', 6000);
+        console.error('Publish errors:', result.errors);
+      }
+    } finally {
+      setPublishing(false);
+    }
+  }
+
+  async function handleDiscard() {
+    if (!hasPendingChanges()) return;
+    const ok = await confirmDialog({
+      title: 'Descartar todas as alterações?',
+      body: `Vai jogar fora ${pendingCount()} alteração(ões) do rascunho. Tem certeza?`,
+      ok: 'Descartar tudo',
+      cancel: 'Voltar',
+      danger: true,
+    });
+    if (!ok) return;
+    discardAll();
+    toast('Alterações descartadas', 'ok');
+  }
+
+  function pendingSummary(): string {
+    const parts = describePending();
+    if (parts.length === 0) return 'Tudo salvo';
+    return parts.map((p) => p.label).join(' · ');
   }
 
   return (
@@ -81,6 +138,47 @@ export default function AdminPanel(props: Props) {
             </div>
           </div>
         </div>
+
+        <Show when={hasPendingChanges()}>
+          <div class="bg-warn-s border-t border-warn/30">
+            <div class="max-w-7xl mx-auto px-5 lg:px-8 py-2.5 flex flex-col lg:flex-row lg:items-center gap-2.5">
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                <span class="w-2 h-2 rounded-full bg-warn animate-pulse shrink-0" />
+                <div class="min-w-0">
+                  <div class="text-xs font-bold text-ink leading-tight">
+                    {pendingCount()} alteração{pendingCount() === 1 ? '' : 'ões'} no rascunho
+                  </div>
+                  <div class="text-[11px] text-ink-soft truncate">{pendingSummary()}</div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleDiscard}
+                  disabled={publishing()}
+                  class="h-9 px-3.5 rounded-lg bg-white hover:bg-line border border-line text-xs font-semibold text-ink-soft hover:text-ink transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                >
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                  Descartar
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePublish}
+                  disabled={publishing()}
+                  class="h-9 px-4 rounded-lg bg-primary hover:bg-primary-h text-xs font-semibold text-white transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 shadow-pop"
+                >
+                  <Show
+                    when={!publishing()}
+                    fallback={<div class="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  >
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  </Show>
+                  {publishing() ? 'Publicando…' : 'Publicar alterações'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </Show>
       </div>
 
       <Show when={tab() === 'reservas'}>

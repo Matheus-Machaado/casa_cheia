@@ -1,6 +1,6 @@
 import { createSignal, createMemo, Show, onMount, onCleanup } from 'solid-js';
 import type { Product, ProductAvailability } from '~/types/shared';
-import { formatBRL } from '~/lib/format';
+import { formatBRL, formatPhoneBR, isValidPhoneBR } from '~/lib/format';
 
 interface Props {
   product: Product;
@@ -10,6 +10,7 @@ interface Props {
 
 export default function ProductModal(props: Props) {
   const [name, setName] = createSignal('');
+  const [phone, setPhone] = createSignal('');
   const [submitting, setSubmitting] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
 
@@ -20,6 +21,8 @@ export default function ProductModal(props: Props) {
     if (submitting()) return false;
     if (isSoldOut()) return false;
     if (name().trim().length < 2) return false;
+    // Phone é opcional, mas se preenchido precisa ser válido
+    if (phone().trim() && !isValidPhoneBR(phone())) return false;
     return true;
   });
 
@@ -57,6 +60,7 @@ export default function ProductModal(props: Props) {
           product_id: props.product.id,
           qty: 1,
           guest_name: name().trim(),
+          guest_phone: phone().trim() || null,
           hp_url: '',
         }),
       });
@@ -150,6 +154,23 @@ export default function ProductModal(props: Props) {
                   onInput={(e) => setName(e.currentTarget.value)}
                   class="w-full h-12 px-4 bg-line-2 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
                 />
+              </div>
+
+              <div>
+                <label for="guest_phone" class="block text-[11px] uppercase tracking-wider text-ink-3 font-bold mb-1.5">
+                  Telefone <span class="normal-case text-ink-3 font-medium">(opcional)</span>
+                </label>
+                <input
+                  id="guest_phone"
+                  type="tel"
+                  inputMode="numeric"
+                  maxLength={15}
+                  placeholder="(11) 99999-9999"
+                  value={phone()}
+                  onInput={(e) => setPhone(formatPhoneBR(e.currentTarget.value))}
+                  class="w-full h-12 px-4 bg-line-2 border-0 rounded-xl text-[15px] focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition"
+                />
+                <p class="text-[11px] text-ink-3 mt-1.5">Se quiser que a Lina te lembre antes do chá.</p>
               </div>
 
               <Show when={error()}>

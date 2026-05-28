@@ -5,6 +5,15 @@ import { authFetch, isLoggedIn } from '~/lib/auth';
 import { formatBRL } from '~/lib/format';
 import { applyBRLMask, formatCentsAsBRL, parseBRLToCents, PRICE_BRL_INPUT_MAX_LENGTH } from '~/lib/masks';
 import { confirmDialog, toast } from './DialogHost';
+import {
+  draftProducts,
+  loadPristineProducts,
+  updateProductPatch,
+  addNewProduct,
+  deleteProduct as draftDeleteProduct,
+  markProductForReset,
+  getPristineProducts,
+} from './draftStore';
 
 interface NewProductDraft {
   title: string;
@@ -26,9 +35,6 @@ const EMPTY_DRAFT: NewProductDraft = {
   qty_desejada: 1,
 };
 
-/**
- * Faz upload de um arquivo de imagem e retorna a URL pública.
- */
 async function uploadImage(file: File): Promise<string | null> {
   if (file.size > 5 * 1024 * 1024) {
     toast('Imagem muito grande (máx 5MB)', 'err');
@@ -78,7 +84,7 @@ function ImageEditor(props: ImageEditorProps) {
     setUploading(false);
     if (url) {
       props.onChange(url);
-      toast('Imagem atualizada', 'ok', 1500);
+      toast('Imagem trocada (lembre-se de publicar)', 'ok', 2000);
     }
     if (fileInput) fileInput.value = '';
   }
@@ -118,11 +124,6 @@ interface QtyStepperProps {
   disabled?: boolean;
 }
 
-/**
- * Stepper de quantidade com botões − e +. O input do meio continua
- * editável (Lina pode selecionar e digitar). Commit no blur do input
- * ou no click dos botões.
- */
 function QtyStepper(props: QtyStepperProps) {
   const min = () => props.min ?? 0;
   const max = () => props.max ?? 1000;
@@ -207,14 +208,9 @@ interface PriceInputProps {
   disabled?: boolean;
 }
 
-/**
- * Input com máscara BRL. Aplica formatação em tempo real (dígito por
- * dígito = centavos) e commit no onBlur.
- */
 function PriceInput(props: PriceInputProps) {
   const [text, setText] = createSignal(props.cents === null ? '' : formatCentsAsBRL(props.cents));
 
-  // Re-sync quando o produto é atualizado (saving completou em outro lugar)
   createEffect(() => {
     const next = props.cents === null ? '' : formatCentsAsBRL(props.cents);
     setText(next);
@@ -249,19 +245,20 @@ function PriceInput(props: PriceInputProps) {
 }
 
 export default function AdminProducts() {
-  const [products, setProducts] = createSignal<Product[]>([]);
   const [search, setSearch] = createSignal('');
   const [filter, setFilter] = createSignal<'all' | Room>('all');
   const [showInactive, setShowInactive] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal<string | null>(null);
-  const [savingId, setSavingId] = createSignal<string | null>(null);
   const [showCreate, setShowCreate] = createSignal(false);
   const [draft, setDraft] = createSignal<NewProductDraft>({ ...EMPTY_DRAFT });
-  const [creating, setCreating] = createSignal(false);
 
   async function load() {
     if (!isLoggedIn()) { setLoading(false); return; }
+    if (getPristineProducts().length > 0) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
@@ -271,7 +268,7 @@ export default function AdminProducts() {
         setError(body.error?.message ?? 'Erro ao carregar produtos');
         return;
       }
-      setProducts(body.data.sort((a, b) => a.order - b.order));
+      loadPristineProducts(body.data.sort((a, b) => a.order - b.order));
     } catch (e) {
       const msg = (e as Error).message;
       if (msg !== 'session-expired') setError(msg);
@@ -283,7 +280,7 @@ export default function AdminProducts() {
   onMount(load);
 
   const filtered = createMemo(() => {
-    let list = products();
+    let list = draftProducts();
     if (!showInactive()) list = list.filter((p) => p.active);
     if (filter() !== 'all') list = list.filter((p) => p.room === filter());
     const q = search().toLowerCase().trim();
@@ -291,135 +288,72 @@ export default function AdminProducts() {
     return list;
   });
 
-  async function patchProduct(id: string, patch: Partial<Product>) {
-    setSavingId(id);
-    try {
-      const res = await authFetch('/api/admin/products', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, patch }),
-      });
-      const body = await res.json() as { data?: Product; error?: { message: string } };
-      if (!res.ok || !body.data) {
-        toast(body.error?.message ?? 'Erro ao salvar', 'err');
-        return false;
-      }
-      setProducts((curr) => curr.map((p) => (p.id === id ? body.data! : p)));
-      toast('Salvo', 'ok', 1500);
-      return true;
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (msg !== 'session-expired') toast(msg, 'err');
-      return false;
-    } finally {
-      setSavingId(null);
-    }
+  function patchProduct(id: string, patch: Partial<Product>) {
+    updateProductPatch(id, patch);
   }
 
   async function resetProduct(id: string, title: string) {
     const ok = await confirmDialog({
       title: 'Resetar alterações?',
-      body: `Volta o "${title}" pros valores originais (preço, título, descrição, etc). Reservas existentes não são afetadas.`,
+      body: `Volta o "${title}" pros valores originais (preço, título, etc) quando você publicar. Reservas existentes não são afetadas.`,
       ok: 'Resetar',
       cancel: 'Voltar',
     });
     if (!ok) return;
-    setSavingId(id);
-    try {
-      const res = await authFetch('/api/admin/products?action=reset', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      const body = await res.json() as { data?: Product; error?: { message: string } };
-      if (!res.ok || !body.data) {
-        toast(body.error?.message ?? 'Erro ao resetar', 'err');
-        return;
-      }
-      setProducts((curr) => curr.map((p) => (p.id === id ? body.data! : p)));
-      toast('Resetado', 'ok');
-    } finally {
-      setSavingId(null);
-    }
+    markProductForReset(id);
+    toast('Vai resetar quando publicar', 'ok', 1800);
   }
 
   async function removeProduct(id: string, title: string) {
     const ok = await confirmDialog({
       title: 'Excluir produto?',
-      body: `"${title}" some da lista pra todo mundo. Reservas existentes desse produto continuam no histórico mas ficam sem item associado. Se quer só esconder, desativa em vez de excluir.`,
+      body: `"${title}" some da lista pra todo mundo quando você publicar. Reservas existentes desse produto continuam no histórico mas ficam sem item associado. Se quer só esconder, desative em vez de excluir.`,
       ok: 'Excluir',
       cancel: 'Voltar',
       danger: true,
     });
     if (!ok) return;
-    setSavingId(id);
-    try {
-      const res = await authFetch('/api/admin/products?action=delete', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id }),
-      });
-      if (!res.ok) {
-        const body = await res.json() as { error?: { message: string } };
-        toast(body.error?.message ?? 'Erro ao excluir', 'err');
-        return;
-      }
-      setProducts((curr) => curr.filter((p) => p.id !== id));
-      toast('Produto excluído', 'ok');
-    } finally {
-      setSavingId(null);
-    }
+    draftDeleteProduct(id);
+    toast('Vai excluir quando publicar', 'ok', 1800);
   }
 
   function updateDraft<K extends keyof NewProductDraft>(key: K, value: NewProductDraft[K]) {
     setDraft({ ...draft(), [key]: value });
   }
 
-  async function submitCreate() {
+  function submitCreate() {
     const d = draft();
     if (!d.title.trim() || !d.amazon_url.trim() || !d.image_url.trim()) {
-      toast('Preencha título, URL Amazon e URL da imagem', 'warn');
+      toast('Preencha título, URL Amazon e imagem', 'warn');
       return;
     }
-    setCreating(true);
-    try {
-      const res = await authFetch('/api/admin/products', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: d.title.trim(),
-          price_brl_cents: d.price_brl_cents,
-          amazon_url: d.amazon_url.trim(),
-          image_url: d.image_url.trim(),
-          description: d.description.trim(),
-          room: d.room,
-          qty_desejada: d.qty_desejada,
-        }),
-      });
-      const body = await res.json() as { data?: Product; error?: { message: string } };
-      if (!res.ok || !body.data) {
-        toast(body.error?.message ?? 'Erro ao criar', 'err');
-        return;
-      }
-      setProducts((curr) => [...curr, body.data!].sort((a, b) => a.order - b.order));
-      setDraft({ ...EMPTY_DRAFT });
-      setShowCreate(false);
-      toast('Produto adicionado', 'ok');
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (msg !== 'session-expired') toast(msg, 'err');
-    } finally {
-      setCreating(false);
-    }
+    // ID temporário com prefixo 'pending-' (só pra rastreio local).
+    const tempId = 'pending-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const next: Product = {
+      id: tempId,
+      title: d.title.trim(),
+      price_brl_cents: d.price_brl_cents,
+      amazon_dp: '',
+      amazon_url: d.amazon_url.trim(),
+      image_url: d.image_url.trim(),
+      description: d.description.trim(),
+      room: d.room,
+      qty_desejada: d.qty_desejada,
+      order: 999,
+      active: true,
+    };
+    addNewProduct(next);
+    setDraft({ ...EMPTY_DRAFT });
+    setShowCreate(false);
+    toast('Adicionado ao rascunho — publique pra subir', 'ok', 2200);
   }
 
   return (
     <div class="max-w-6xl mx-auto px-5 lg:px-8 py-5 lg:py-7 space-y-5">
-      {/* Header */}
       <div class="bg-white border border-line rounded-2xl p-5 lg:p-6 flex flex-col lg:flex-row lg:items-start lg:justify-between gap-3">
         <div>
           <h2 class="text-lg font-bold text-ink tracking-tight">Produtos do catálogo</h2>
-          <p class="text-sm text-ink-soft mt-1">Edite preço, título, link Amazon, quantidade e status. Salva automático ao sair do campo. Pra adicionar item novo, clique no botão à direita.</p>
+          <p class="text-sm text-ink-soft mt-1">Edite preço, título, link Amazon, quantidade e status. Mudanças ficam no rascunho até você clicar em <strong>Publicar</strong> no topo.</p>
         </div>
         <button
           type="button"
@@ -431,7 +365,6 @@ export default function AdminProducts() {
         </button>
       </div>
 
-      {/* Filtros */}
       <div class="bg-white border border-line rounded-2xl p-3 lg:p-4 flex flex-col lg:flex-row gap-3">
         <div class="flex-1 relative">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3 pointer-events-none">
@@ -482,7 +415,7 @@ export default function AdminProducts() {
       <div class="space-y-2">
         <For each={filtered()}>
           {(p) => (
-            <div class={`bg-white border border-line rounded-2xl p-4 ${!p.active ? 'opacity-60' : ''} ${savingId() === p.id ? 'ring-2 ring-primary/50' : ''} transition`}>
+            <div class={`bg-white border border-line rounded-2xl p-4 ${!p.active ? 'opacity-60' : ''} transition`}>
               <div class="flex flex-col lg:flex-row gap-4">
                 <div class="flex items-start gap-3 flex-1 min-w-0">
                   <ImageEditor
@@ -500,10 +433,7 @@ export default function AdminProducts() {
                       type="text"
                       value={p.title}
                       maxLength={200}
-                      onChange={(e) => {
-                        const v = e.currentTarget.value.trim();
-                        if (v && v !== p.title) patchProduct(p.id, { title: v });
-                      }}
+                      onInput={(e) => patchProduct(p.id, { title: e.currentTarget.value })}
                       class="w-full text-sm font-semibold text-ink bg-transparent border-0 border-b border-transparent hover:border-line focus:border-primary focus:outline-none transition py-1"
                     />
                     <input
@@ -511,10 +441,7 @@ export default function AdminProducts() {
                       maxLength={500}
                       value={p.amazon_url}
                       placeholder="https://www.amazon.com.br/dp/..."
-                      onChange={(e) => {
-                        const v = e.currentTarget.value.trim();
-                        if (v && v !== p.amazon_url) patchProduct(p.id, { amazon_url: v });
-                      }}
+                      onInput={(e) => patchProduct(p.id, { amazon_url: e.currentTarget.value })}
                       class="w-full text-[11px] text-ink-3 bg-transparent border-0 border-b border-transparent hover:border-line focus:border-primary focus:outline-none transition py-0.5 mt-0.5 font-mono truncate"
                     />
                   </div>
@@ -559,10 +486,7 @@ export default function AdminProducts() {
                   rows={2}
                   maxLength={500}
                   value={p.description}
-                  onChange={(e) => {
-                    const v = e.currentTarget.value.trim();
-                    if (v !== p.description) patchProduct(p.id, { description: v });
-                  }}
+                  onInput={(e) => patchProduct(p.id, { description: e.currentTarget.value })}
                   class="w-full px-3 py-2 bg-line-2 border-0 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary focus:bg-white transition resize-none"
                 />
                 <div class="mt-2 flex items-center justify-between flex-wrap gap-2">
@@ -582,7 +506,7 @@ export default function AdminProducts() {
                     <button
                       type="button"
                       onClick={() => removeProduct(p.id, p.title)}
-                      title="Remove permanentemente"
+                      title="Remove ao publicar"
                       class="h-8 px-2.5 rounded-lg text-xs font-semibold text-ink-soft hover:text-danger hover:bg-danger-s transition cursor-pointer flex items-center gap-1"
                     >
                       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -596,7 +520,6 @@ export default function AdminProducts() {
         </For>
       </div>
 
-      {/* Modal: criar novo produto */}
       <Show when={showCreate()}>
         <div class="fixed inset-0 z-50 grid place-items-end lg:place-items-center p-0 lg:p-4" style="background: rgba(9,9,11,0.55); backdrop-filter: blur(2px);" role="dialog" aria-modal="true">
           <div class="bg-white w-full lg:max-w-2xl rounded-t-2xl lg:rounded-2xl shadow-2xl max-h-[92vh] overflow-y-auto">
@@ -670,9 +593,9 @@ export default function AdminProducts() {
             </div>
 
             <div class="sticky bottom-0 bg-line-2 border-t border-line p-3 lg:p-4 flex items-center gap-2 justify-end">
-              <button type="button" onClick={() => setShowCreate(false)} disabled={creating()} class="h-10 px-4 rounded-xl bg-white hover:bg-line text-sm font-semibold text-ink-soft transition cursor-pointer">Cancelar</button>
-              <button type="button" onClick={submitCreate} disabled={creating()} class="h-10 px-5 rounded-xl bg-primary hover:bg-primary-h text-white text-sm font-semibold transition cursor-pointer disabled:opacity-50">
-                {creating() ? 'Adicionando…' : 'Adicionar'}
+              <button type="button" onClick={() => setShowCreate(false)} class="h-10 px-4 rounded-xl bg-white hover:bg-line text-sm font-semibold text-ink-soft transition cursor-pointer">Cancelar</button>
+              <button type="button" onClick={submitCreate} class="h-10 px-5 rounded-xl bg-primary hover:bg-primary-h text-white text-sm font-semibold transition cursor-pointer">
+                Adicionar ao rascunho
               </button>
             </div>
           </div>
