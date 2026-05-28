@@ -6,67 +6,363 @@ import { getAllProducts } from '~/lib/products';
 const products = getAllProducts();
 ---
 
-<Base title="Painel admin — Casa Cheia" noindex>
-  <div id="login-gate">
-    <div class="max-w-md mx-auto px-5 py-12 lg:py-20">
-      <div class="text-center mb-7">
-        <div class="w-14 h-14 rounded-2xl bg-primary text-white grid place-items-center mx-auto mb-4">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </div>
-        <h1 class="text-3xl font-bold text-ink tracking-tight">Painel da <span class="font-display italic font-medium text-primary">Lina</span></h1>
-        <p class="text-sm text-ink-soft mt-2">Login por magic link no email cadastrado.</p>
-      </div>
-
-      <div class="bg-white rounded-2xl p-6 border border-line">
-        <button id="open-login" type="button" class="w-full h-12 rounded-xl bg-primary hover:bg-primary-h text-white font-semibold transition flex items-center justify-center gap-2">
-          Entrar
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-        </button>
-        <div class="mt-5 pt-5 border-t border-line text-xs text-ink-3 text-center">
-          Sem senhas. Só link no email.
-        </div>
-      </div>
+<Base title="Painel · Casa Cheia" noindex>
+  <div id="bootScreen" class="boot-screen">
+    <div class="boot-content">
+      <div class="boot-spinner" aria-hidden="true"></div>
+      <p>Abrindo o painel…</p>
     </div>
   </div>
 
-  <div id="admin-panel" class="hidden">
-    <AdminPanel client:load products={products} />
+  <div id="loginScreen" class="login-screen" hidden>
+    <div class="login-grid">
+      <section class="login-form-side">
+        <div class="login-form-stack">
+          <a href="/" class="login-brand">
+            <span class="login-brand-mark">L</span>
+            <span class="login-brand-text">
+              <strong>Casa Cheia</strong>
+              <small>chá da Lina</small>
+            </span>
+          </a>
+          <h1 class="login-title">Painel da <em>Lina</em></h1>
+          <p class="login-sub">Entre pra ver as reservas e disparar mensagens personalizadas no WhatsApp.</p>
+
+          <form id="loginForm" class="login-form" novalidate>
+            <div class="login-field">
+              <label for="logEmail">E-mail</label>
+              <input id="logEmail" type="email" autocomplete="username" inputmode="email" required placeholder="seu@email.com" />
+            </div>
+            <div class="login-field login-pw">
+              <label for="logPw">Senha</label>
+              <input id="logPw" type="password" autocomplete="current-password" required placeholder="••••••••" />
+              <button class="login-eye" id="logEye" type="button" aria-pressed="false" aria-label="Mostrar senha">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+              </button>
+            </div>
+            <p class="login-error" id="logError" hidden></p>
+            <button class="login-submit" id="logSubmit" type="submit">Entrar</button>
+          </form>
+
+          <button class="login-forgot" id="logForgot" type="button">Esqueci minha senha</button>
+          <a href="/" class="login-back">← Voltar pro site</a>
+        </div>
+      </section>
+
+      <aside class="login-hero" aria-hidden="true">
+        <div class="login-hero-overlay"></div>
+        <div class="login-hero-content">
+          <span class="login-hero-eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Área restrita
+          </span>
+          <h2 class="login-hero-headline">Bem-vinda<br />de volta, <em>Lina</em>.</h2>
+          <p class="login-hero-quote">"Cada presentinho aqui fica registrado pra você ver quem ajudou, e disparar um obrigada de volta com nome e tudo."</p>
+        </div>
+      </aside>
+    </div>
   </div>
 
-  <script src="https://identity.netlify.com/v1/netlify-identity-widget.js" is:inline></script>
-  <script is:inline>
-    (function () {
-      const gate = document.getElementById('login-gate');
-      const panel = document.getElementById('admin-panel');
-      const openLogin = document.getElementById('open-login');
-
-      function render(user) {
-        if (user) {
-          gate.classList.add('hidden');
-          panel.classList.remove('hidden');
-        } else {
-          gate.classList.remove('hidden');
-          panel.classList.add('hidden');
-        }
-      }
-
-      function init() {
-        if (!window.netlifyIdentity) return;
-        window.netlifyIdentity.on('init', (user) => render(user));
-        window.netlifyIdentity.on('login', (user) => { render(user); window.netlifyIdentity.close(); });
-        window.netlifyIdentity.on('logout', () => render(null));
-        window.netlifyIdentity.init();
-      }
-
-      openLogin.addEventListener('click', () => {
-        if (window.netlifyIdentity) window.netlifyIdentity.open();
-      });
-
-      if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', init);
-      } else {
-        init();
-      }
-    })();
-  </script>
+  <div id="appScreen" class="app-screen" hidden>
+    <AdminPanel client:load products={products} />
+  </div>
 </Base>
+
+<style>
+  :global(body) {
+    background: #FAFAFA;
+  }
+  .boot-screen, .login-screen, .app-screen { min-height: 100vh; }
+  .boot-screen { display: grid; place-items: center; }
+  .boot-content { display: flex; flex-direction: column; align-items: center; gap: 12px; color: #71717A; font-size: 14px; }
+  .boot-spinner { width: 32px; height: 32px; border-radius: 50%; border: 3px solid #E4E4E7; border-top-color: #F43F5E; animation: spin 0.8s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .login-screen {
+    display: grid;
+    background: #FAFAFA;
+  }
+  .login-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+  }
+  @media (min-width: 1024px) {
+    .login-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+
+  .login-form-side {
+    display: grid;
+    place-items: center;
+    padding: 32px 20px;
+    background: #FFFFFF;
+  }
+  .login-form-stack {
+    width: 100%;
+    max-width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .login-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    text-decoration: none;
+    color: inherit;
+    margin-bottom: 4px;
+  }
+  .login-brand-mark {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    background: #F43F5E;
+    color: #FFFFFF;
+    display: grid; place-items: center;
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-weight: 700;
+    font-size: 19px;
+  }
+  .login-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+  .login-brand-text strong { font-weight: 600; font-size: 15px; color: #09090B; }
+  .login-brand-text small { font-size: 11px; color: #71717A; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .login-title {
+    font-size: 32px;
+    font-weight: 700;
+    color: #09090B;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    margin: 6px 0 2px;
+  }
+  .login-title em {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    color: #F43F5E;
+  }
+  .login-sub { font-size: 14px; color: #52525B; line-height: 1.5; }
+
+  .login-form { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+  .login-field { display: flex; flex-direction: column; gap: 6px; position: relative; }
+  .login-field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #71717A; font-weight: 700; }
+  .login-field input {
+    height: 46px;
+    padding: 0 14px;
+    background: #F4F4F5;
+    border: 0;
+    border-radius: 12px;
+    font-size: 15px;
+    color: #09090B;
+    outline: 0;
+    transition: background 0.15s, box-shadow 0.15s;
+  }
+  .login-field input:focus { background: #FFFFFF; box-shadow: 0 0 0 2px #F43F5E; }
+  .login-field input::placeholder { color: #A1A1AA; }
+  .login-pw { position: relative; }
+  .login-pw input { padding-right: 44px; }
+  .login-eye {
+    position: absolute;
+    right: 6px;
+    bottom: 5px;
+    width: 36px; height: 36px;
+    background: transparent;
+    border: 0;
+    border-radius: 8px;
+    color: #71717A;
+    display: grid; place-items: center;
+    cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .login-eye:hover { background: #F4F4F5; color: #09090B; }
+
+  .login-error {
+    background: rgba(244, 63, 94, 0.08);
+    color: #BE123C;
+    font-size: 13px;
+    padding: 9px 12px;
+    border-radius: 10px;
+    margin: 2px 0;
+  }
+
+  .login-submit {
+    height: 46px;
+    border: 0;
+    border-radius: 12px;
+    background: #F43F5E;
+    color: #FFFFFF;
+    font-weight: 600;
+    font-size: 15px;
+    cursor: pointer;
+    transition: background 0.15s, transform 0.15s;
+    margin-top: 4px;
+  }
+  .login-submit:hover { background: #E11D48; }
+  .login-submit:active { transform: scale(0.99); }
+  .login-submit:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+  .login-forgot {
+    background: transparent;
+    border: 0;
+    color: #71717A;
+    font-size: 13px;
+    text-align: center;
+    cursor: pointer;
+    padding: 6px;
+    transition: color 0.15s;
+  }
+  .login-forgot:hover { color: #F43F5E; }
+
+  .login-back {
+    text-align: center;
+    color: #A1A1AA;
+    font-size: 12px;
+    text-decoration: none;
+    padding-top: 12px;
+    border-top: 1px solid #E4E4E7;
+    margin-top: 8px;
+    transition: color 0.15s;
+  }
+  .login-back:hover { color: #09090B; }
+
+  .login-hero {
+    position: relative;
+    background-color: #09090B;
+    background-image: url('/animation/before.png');
+    background-size: cover;
+    background-position: center;
+    display: none;
+    overflow: hidden;
+  }
+  @media (min-width: 1024px) {
+    .login-hero { display: block; }
+  }
+  .login-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, rgba(9,9,11,0.7) 0%, rgba(244,63,94,0.5) 100%);
+  }
+  .login-hero-content {
+    position: absolute;
+    inset: 0;
+    padding: 48px 56px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    gap: 18px;
+    color: #FFFFFF;
+  }
+  .login-hero-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-size: 11px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.85);
+    width: fit-content;
+  }
+  .login-hero-headline {
+    font-size: 48px;
+    line-height: 1.05;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: -0.02em;
+  }
+  .login-hero-headline em {
+    font-family: Georgia, serif;
+    font-style: italic;
+    font-weight: 500;
+    color: #FACC15;
+  }
+  .login-hero-quote {
+    font-size: 14px;
+    line-height: 1.6;
+    color: rgba(255,255,255,0.85);
+    max-width: 380px;
+    font-style: italic;
+  }
+</style>
+
+<script>
+  import { adoptHashSession, isLoggedIn, login, requestRecovery } from '../../lib/auth';
+
+  const boot = document.getElementById('bootScreen')!;
+  const loginScreen = document.getElementById('loginScreen')!;
+  const appScreen = document.getElementById('appScreen')!;
+  const form = document.getElementById('loginForm') as HTMLFormElement;
+  const emailInput = document.getElementById('logEmail') as HTMLInputElement;
+  const pwInput = document.getElementById('logPw') as HTMLInputElement;
+  const eyeBtn = document.getElementById('logEye') as HTMLButtonElement;
+  const submitBtn = document.getElementById('logSubmit') as HTMLButtonElement;
+  const errorEl = document.getElementById('logError') as HTMLParagraphElement;
+  const forgotBtn = document.getElementById('logForgot') as HTMLButtonElement;
+
+  function show(which: 'boot' | 'login' | 'app') {
+    boot.hidden = which !== 'boot';
+    loginScreen.hidden = which !== 'login';
+    appScreen.hidden = which !== 'app';
+  }
+
+  function showError(msg: string) {
+    errorEl.textContent = msg;
+    errorEl.hidden = false;
+  }
+  function clearError() { errorEl.hidden = true; }
+
+  eyeBtn.addEventListener('click', () => {
+    const showing = pwInput.type === 'text';
+    pwInput.type = showing ? 'password' : 'text';
+    eyeBtn.setAttribute('aria-pressed', String(!showing));
+    pwInput.focus();
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Entrando…';
+    try {
+      await login(emailInput.value.trim(), pwInput.value);
+      show('app');
+    } catch (ex) {
+      showError((ex as Error).message || 'Não foi possível entrar.');
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = 'Entrar';
+    }
+  });
+
+  forgotBtn.addEventListener('click', async () => {
+    const email = emailInput.value.trim();
+    clearError();
+    if (!email) {
+      showError('Digite seu e-mail acima primeiro.');
+      return;
+    }
+    forgotBtn.disabled = true;
+    forgotBtn.textContent = 'Enviando…';
+    try {
+      await requestRecovery(email);
+      showError('Se houver conta com esse e-mail, enviamos o link de redefinição.');
+      errorEl.style.color = '#15803D';
+      errorEl.style.background = 'rgba(34, 197, 94, 0.08)';
+    } catch (ex) {
+      showError((ex as Error).message || 'Não foi possível enviar.');
+    } finally {
+      forgotBtn.disabled = false;
+      forgotBtn.textContent = 'Esqueci minha senha';
+    }
+  });
+
+  if (adoptHashSession()) {
+    show('app');
+  } else if (isLoggedIn()) {
+    show('app');
+  } else {
+    show('login');
+  }
+</script>

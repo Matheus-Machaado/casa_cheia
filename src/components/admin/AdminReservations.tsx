@@ -1,5 +1,6 @@
 import { createSignal, createMemo, For, Show, onMount } from 'solid-js';
 import type { Reservation, Product, MessageKind } from '~/types/shared';
+import { authFetch } from '~/lib/auth';
 
 interface Props {
   products: Product[];
@@ -26,7 +27,7 @@ export default function AdminReservations(props: Props) {
 
   async function loadConfirmedSnapshot() {
     try {
-      const res = await fetch('/api/reservations?status=confirmada', { credentials: 'include' });
+      const res = await authFetch('/api/reservations?status=confirmada');
       if (res.ok) {
         const body = await res.json() as { data: Reservation[] };
         setAllConfirmed(body.data);
@@ -38,7 +39,7 @@ export default function AdminReservations(props: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/reservations?status=${tab()}`, { credentials: 'include' });
+      const res = await authFetch(`/api/reservations?status=${tab()}`);
       if (res.status === 401) {
         setError('Sessão expirou. Recarrega a página e faz login de novo.');
         return;
@@ -72,10 +73,9 @@ export default function AdminReservations(props: Props) {
   async function cancel(id: string) {
     if (!confirm('Tem certeza? O convidado pode já ter comprado o item.')) return;
     const reason = prompt('Motivo (opcional, só pra você):') ?? null;
-    const res = await fetch(`/api/reservations/${id}`, {
+    const res = await authFetch(`/api/reservations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ action: 'cancel', reason }),
     });
     if (res.ok) {
@@ -88,10 +88,9 @@ export default function AdminReservations(props: Props) {
   }
 
   async function restore(id: string) {
-    const res = await fetch(`/api/reservations/${id}`, {
+    const res = await authFetch(`/api/reservations/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ action: 'restore' }),
     });
     if (res.ok) {
@@ -104,10 +103,9 @@ export default function AdminReservations(props: Props) {
   }
 
   async function fetchLink(id: string, kind: MessageKind): Promise<{ url: string; message: string } | null> {
-    const res = await fetch('/api/admin/whatsapp-link', {
+    const res = await authFetch('/api/admin/whatsapp-link', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
       body: JSON.stringify({ reservation_id: id, kind }),
     });
     const body = await res.json() as { data?: { url: string; message: string }; error?: { message: string } };

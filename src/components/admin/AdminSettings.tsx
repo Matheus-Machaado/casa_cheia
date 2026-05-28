@@ -1,5 +1,6 @@
 import { createSignal, onMount, Show, For } from 'solid-js';
 import type { Settings } from '~/types/shared';
+import { authFetch } from '~/lib/auth';
 
 const PLACEHOLDER_DOCS: Array<{ key: string; example: string }> = [
   { key: '{nome}', example: 'Primeiro nome do convidado (ex: Ana)' },
@@ -44,7 +45,7 @@ export default function AdminSettings() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/admin/settings', { credentials: 'include' });
+      const res = await authFetch('/api/admin/settings');
       if (res.status === 401) {
         setError('Sessão expirou. Recarrega a página e faz login de novo.');
         return;
@@ -69,10 +70,9 @@ export default function AdminSettings() {
     setError(null);
     setSuccess(null);
     try {
-      const res = await fetch('/api/admin/settings', {
+      const res = await authFetch('/api/admin/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
         body: JSON.stringify(patch),
       });
       const body = (await res.json()) as { data?: Settings; error?: { message: string } };

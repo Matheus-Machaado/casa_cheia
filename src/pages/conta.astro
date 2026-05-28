@@ -1,0 +1,402 @@
+---
+import Base from '~/layouts/Base.astro';
+---
+
+<Base title="Acesso ao painel · Casa Cheia" noindex>
+  <div class="conta-screen">
+    <div class="conta-grid">
+      <section class="conta-form-side">
+        <div class="conta-stack">
+          <a href="/" class="conta-brand">
+            <span class="conta-brand-mark">L</span>
+            <span class="conta-brand-text">
+              <strong>Casa Cheia</strong>
+              <small>chá da Lina</small>
+            </span>
+          </a>
+
+          <div id="contaLoading" class="conta-state">
+            <div class="boot-spinner" aria-hidden="true"></div>
+            <p>Carregando…</p>
+          </div>
+
+          <form id="contaForm" class="conta-state" hidden novalidate>
+            <h1 class="conta-title" id="contaTitle">Definir senha</h1>
+            <p class="conta-sub" id="contaSub">Crie a senha de acesso ao painel.</p>
+
+            <div class="conta-field">
+              <label for="pw1">Nova senha</label>
+              <div class="conta-field-input">
+                <input id="pw1" type="password" autocomplete="new-password" maxlength="128" placeholder="••••••••" />
+                <button type="button" class="conta-eye" id="eye1" aria-label="Mostrar senha" aria-pressed="false">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="conta-field">
+              <label for="pw2">Confirmar senha</label>
+              <div class="conta-field-input">
+                <input id="pw2" type="password" autocomplete="new-password" maxlength="128" placeholder="Repita a senha" />
+                <button type="button" class="conta-eye" id="eye2" aria-label="Mostrar senha" aria-pressed="false">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="conta-strength" aria-hidden="true">
+              <span class="conta-strength-bar" id="strengthBar"></span>
+            </div>
+
+            <ul class="conta-rules" id="pwRules"></ul>
+
+            <p class="conta-error" id="contaError" role="alert" hidden></p>
+
+            <button type="submit" class="conta-submit" id="contaSubmit" disabled>Salvar senha</button>
+          </form>
+
+          <div id="contaMsg" class="conta-state" hidden>
+            <div class="conta-msg-icon" id="contaMsgIcon" aria-hidden="true"></div>
+            <h1 class="conta-title" id="contaMsgTitle"></h1>
+            <p class="conta-sub" id="contaMsgText"></p>
+            <a href="/admin" class="conta-submit conta-submit-link" id="contaMsgCta">Entrar no painel</a>
+          </div>
+
+          <a href="/" class="conta-back">← Voltar pro site</a>
+        </div>
+      </section>
+
+      <aside class="conta-hero" aria-hidden="true">
+        <div class="conta-hero-overlay"></div>
+        <div class="conta-hero-content">
+          <span class="conta-hero-eyebrow">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            Área restrita
+          </span>
+          <h2 class="conta-hero-headline">Casa Cheia, <em>painel da Lina</em>.</h2>
+          <p class="conta-hero-quote">"Suas alterações em mensagens e configurações ficam salvas imediatamente. Sem mexer em código."</p>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>
+
+<style>
+  :global(body) { background: #FAFAFA; }
+  .conta-screen { min-height: 100vh; background: #FAFAFA; }
+  .conta-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    min-height: 100vh;
+  }
+  @media (min-width: 1024px) {
+    .conta-grid { grid-template-columns: 1fr 1fr; }
+  }
+
+  .conta-form-side { display: grid; place-items: center; padding: 32px 20px; background: #FFFFFF; }
+  .conta-stack { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 16px; }
+
+  .conta-brand {
+    display: inline-flex; align-items: center; gap: 10px;
+    text-decoration: none; color: inherit; margin-bottom: 4px;
+  }
+  .conta-brand-mark {
+    width: 38px; height: 38px; border-radius: 50%;
+    background: #F43F5E; color: #FFFFFF;
+    display: grid; place-items: center;
+    font-family: Georgia, serif; font-style: italic; font-weight: 700; font-size: 19px;
+  }
+  .conta-brand-text { display: flex; flex-direction: column; line-height: 1.1; }
+  .conta-brand-text strong { font-weight: 600; font-size: 15px; color: #09090B; }
+  .conta-brand-text small { font-size: 11px; color: #71717A; text-transform: uppercase; letter-spacing: 0.08em; }
+
+  .conta-state { display: flex; flex-direction: column; gap: 14px; align-items: flex-start; }
+  .conta-state[hidden] { display: none; }
+
+  #contaLoading, #contaMsg { align-items: center; text-align: center; gap: 12px; }
+  #contaLoading p, #contaMsg p { color: #52525B; }
+
+  .boot-spinner {
+    width: 32px; height: 32px; border-radius: 50%;
+    border: 3px solid #E4E4E7; border-top-color: #F43F5E;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .conta-title { font-size: 28px; font-weight: 700; color: #09090B; letter-spacing: -0.02em; line-height: 1.1; margin: 6px 0 0; }
+  .conta-sub { font-size: 14px; color: #52525B; line-height: 1.5; margin: 0; }
+
+  .conta-field { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+  .conta-field label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #71717A; font-weight: 700; }
+  .conta-field-input { position: relative; }
+  .conta-field input {
+    width: 100%; height: 46px; padding: 0 44px 0 14px;
+    background: #F4F4F5; border: 0; border-radius: 12px;
+    font-size: 15px; color: #09090B; outline: 0;
+    transition: background 0.15s, box-shadow 0.15s;
+    font-family: inherit;
+  }
+  .conta-field input:focus { background: #FFFFFF; box-shadow: 0 0 0 2px #F43F5E; }
+  .conta-field input::placeholder { color: #A1A1AA; }
+  .conta-eye {
+    position: absolute; right: 6px; top: 5px;
+    width: 36px; height: 36px; background: transparent; border: 0; border-radius: 8px;
+    color: #71717A; display: grid; place-items: center; cursor: pointer;
+    transition: background 0.15s, color 0.15s;
+  }
+  .conta-eye:hover { background: #E4E4E7; color: #09090B; }
+
+  .conta-strength { width: 100%; height: 4px; background: #F4F4F5; border-radius: 2px; overflow: hidden; }
+  .conta-strength-bar { display: block; height: 100%; width: 0%; background: #F43F5E; transition: width 0.2s; border-radius: 2px; }
+  .conta-strength-bar[data-score='4'] { background: #16A34A; }
+  .conta-strength-bar[data-score='3'] { background: #F43F5E; }
+  .conta-strength-bar[data-score='2'] { background: #FACC15; }
+  .conta-strength-bar[data-score='1'], .conta-strength-bar[data-score='0'] { background: #E11D48; }
+
+  .conta-rules { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 4px; width: 100%; }
+  .conta-rules li {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #71717A;
+    transition: color 0.15s;
+  }
+  .conta-rules li.ok { color: #16A34A; }
+  .conta-rules li .rule-dot {
+    width: 14px; height: 14px; border-radius: 50%;
+    background: #E4E4E7;
+    display: grid; place-items: center;
+    transition: background 0.15s;
+  }
+  .conta-rules li.ok .rule-dot { background: #16A34A; color: #FFFFFF; }
+
+  .conta-error {
+    background: rgba(244, 63, 94, 0.08); color: #BE123C;
+    font-size: 13px; padding: 9px 12px; border-radius: 10px;
+    width: 100%; margin: 0;
+  }
+
+  .conta-submit {
+    height: 46px; border: 0; border-radius: 12px;
+    background: #F43F5E; color: #FFFFFF;
+    font-weight: 600; font-size: 15px; cursor: pointer;
+    width: 100%;
+    transition: background 0.15s, transform 0.15s;
+    text-decoration: none; display: grid; place-items: center;
+  }
+  .conta-submit:hover { background: #E11D48; }
+  .conta-submit:active { transform: scale(0.99); }
+  .conta-submit:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+  .conta-submit-link { line-height: 46px; }
+
+  .conta-msg-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: #FEF3F2; color: #F43F5E;
+    display: grid; place-items: center;
+    margin: 0 auto 4px;
+  }
+  .conta-msg-icon.ok { background: rgba(34,197,94,0.1); color: #16A34A; }
+  .conta-msg-icon.warn { background: rgba(244,63,94,0.1); color: #E11D48; }
+  .conta-msg-icon.info { background: rgba(99,102,241,0.1); color: #6366F1; }
+
+  .conta-back {
+    text-align: center; color: #A1A1AA; font-size: 12px; text-decoration: none;
+    padding-top: 12px; border-top: 1px solid #E4E4E7;
+    transition: color 0.15s;
+  }
+  .conta-back:hover { color: #09090B; }
+
+  .conta-hero {
+    position: relative;
+    background-color: #09090B;
+    background-image: url('/animation/before.png');
+    background-size: cover; background-position: center;
+    display: none; overflow: hidden;
+  }
+  @media (min-width: 1024px) { .conta-hero { display: block; } }
+  .conta-hero-overlay { position: absolute; inset: 0; background: linear-gradient(135deg, rgba(9,9,11,0.7) 0%, rgba(244,63,94,0.5) 100%); }
+  .conta-hero-content {
+    position: absolute; inset: 0; padding: 48px 56px;
+    display: flex; flex-direction: column; justify-content: flex-end; gap: 18px;
+    color: #FFFFFF;
+  }
+  .conta-hero-eyebrow {
+    display: inline-flex; align-items: center; gap: 6px;
+    text-transform: uppercase; letter-spacing: 0.12em; font-size: 11px; font-weight: 700;
+    color: rgba(255,255,255,0.85); width: fit-content;
+  }
+  .conta-hero-headline { font-size: 44px; line-height: 1.1; font-weight: 700; margin: 0; letter-spacing: -0.02em; }
+  .conta-hero-headline em { font-family: Georgia, serif; font-style: italic; font-weight: 500; color: #FACC15; }
+  .conta-hero-quote { font-size: 14px; line-height: 1.6; color: rgba(255,255,255,0.85); max-width: 380px; font-style: italic; }
+</style>
+
+<script>
+  import { verifyInvite, verifyRecovery, verifyConfirmation } from '../lib/auth';
+  import { PASSWORD_RULES, validatePasswordStrength, ruleStatus, strengthScore } from '../lib/passwordPolicy';
+
+  const $ = (id: string) => document.getElementById(id)!;
+  const elLoading = $('contaLoading');
+  const elForm = $('contaForm') as HTMLFormElement;
+  const elMsg = $('contaMsg');
+
+  function show(which: HTMLElement) {
+    for (const el of [elLoading, elForm, elMsg]) el.hidden = el !== which;
+  }
+
+  type MsgOptions = { icon: 'ok' | 'warn' | 'info'; title: string; text: string; cta?: string; ctaHref?: string };
+  function msg(opts: MsgOptions) {
+    const icon = $('contaMsgIcon');
+    icon.className = 'conta-msg-icon ' + opts.icon;
+    icon.innerHTML = opts.icon === 'ok'
+      ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>'
+      : opts.icon === 'warn'
+      ? '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+      : '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>';
+    $('contaMsgTitle').textContent = opts.title;
+    $('contaMsgText').textContent = opts.text;
+    const cta = $('contaMsgCta') as HTMLAnchorElement;
+    if (opts.cta) { cta.textContent = opts.cta; cta.href = opts.ctaHref || '/admin'; cta.hidden = false; }
+    else cta.hidden = true;
+    show(elMsg);
+  }
+
+  function buildRules() {
+    const ul = $('pwRules');
+    ul.innerHTML = PASSWORD_RULES.map((r) =>
+      `<li data-rule="${r.id}"><span class="rule-dot"></span><span>${r.label}</span></li>`
+    ).join('');
+  }
+  function refreshRules(pw: string) {
+    for (const s of ruleStatus(pw)) {
+      const li = document.querySelector(`#pwRules li[data-rule="${s.id}"]`) as HTMLLIElement | null;
+      if (!li) continue;
+      li.classList.toggle('ok', s.ok);
+      const dot = li.querySelector('.rule-dot') as HTMLSpanElement;
+      dot.innerHTML = s.ok ? '<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>' : '';
+    }
+    const score = strengthScore(pw);
+    const bar = $('strengthBar');
+    bar.style.width = (score / 4 * 100) + '%';
+    bar.dataset.score = String(score);
+  }
+
+  function wireEye(btnId: string, inputId: string) {
+    const btn = $(btnId);
+    const inp = $(inputId) as HTMLInputElement;
+    btn.addEventListener('click', () => {
+      const showing = inp.type === 'text';
+      inp.type = showing ? 'password' : 'text';
+      btn.setAttribute('aria-pressed', String(!showing));
+      btn.setAttribute('aria-label', showing ? 'Mostrar senha' : 'Ocultar senha');
+      inp.focus();
+    });
+  }
+
+  function setupForm(mode: 'invite' | 'recovery', token: string) {
+    buildRules();
+    wireEye('eye1', 'pw1');
+    wireEye('eye2', 'pw2');
+
+    const pw1 = $('pw1') as HTMLInputElement;
+    const pw2 = $('pw2') as HTMLInputElement;
+    const submit = $('contaSubmit') as HTMLButtonElement;
+    const err = $('contaError') as HTMLParagraphElement;
+
+    if (mode === 'recovery') {
+      $('contaTitle').textContent = 'Redefinir senha';
+      $('contaSub').textContent = 'Escolha uma nova senha pro painel.';
+    } else {
+      $('contaTitle').textContent = 'Criar sua senha';
+      $('contaSub').textContent = 'Defina a senha de acesso ao painel da Casa Cheia.';
+    }
+
+    function validate() {
+      refreshRules(pw1.value);
+      const strong = validatePasswordStrength(pw1.value);
+      const match = pw1.value.length > 0 && pw1.value === pw2.value;
+      let reason = '';
+      if (!strong.valid) reason = strong.reason;
+      else if (!match && pw2.value.length > 0) reason = 'As senhas não conferem.';
+      if (reason && (pw1.value || pw2.value)) { err.textContent = reason; err.hidden = false; }
+      else err.hidden = true;
+      submit.disabled = !(strong.valid && match);
+    }
+    pw1.addEventListener('input', validate);
+    pw2.addEventListener('input', validate);
+
+    elForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const strong = validatePasswordStrength(pw1.value);
+      if (!strong.valid || pw1.value !== pw2.value) { validate(); return; }
+      submit.disabled = true;
+      submit.textContent = 'Salvando…';
+      try {
+        if (mode === 'invite') await verifyInvite(token, pw1.value);
+        else await verifyRecovery(token, pw1.value);
+        submit.textContent = 'Entrando…';
+        // Sessão já foi persistida pelo verifyInvite/verifyRecovery —
+        // o painel detecta no isLoggedIn().
+        window.location.assign('/admin');
+      } catch (ex) {
+        submit.disabled = false;
+        submit.textContent = 'Salvar senha';
+        err.textContent = (ex as Error).message || 'Não foi possível salvar. Tente novamente ou peça um novo link.';
+        err.hidden = false;
+      }
+    });
+
+    show(elForm);
+  }
+
+  async function boot() {
+    const h = (window.location.hash || '').replace(/^#/, '');
+    const p = new URLSearchParams(h);
+    const invite = p.get('invite_token');
+    const recovery = p.get('recovery_token');
+    const confirmation = p.get('confirmation_token');
+    const error = p.get('error');
+    const errorDesc = p.get('error_description');
+
+    if (error) {
+      msg({
+        icon: 'warn',
+        title: 'Link inválido ou expirado',
+        text: errorDesc
+          ? decodeURIComponent(errorDesc.replace(/\+/g, ' '))
+          : 'Este link não é mais válido. Peça um novo convite ou uma nova recuperação de senha.',
+        cta: 'Ir para o painel', ctaHref: '/admin',
+      });
+      return;
+    }
+
+    if (invite) { setupForm('invite', invite); return; }
+    if (recovery) { setupForm('recovery', recovery); return; }
+
+    if (confirmation) {
+      try {
+        await verifyConfirmation(confirmation);
+        msg({
+          icon: 'ok',
+          title: 'E-mail confirmado!',
+          text: 'Sua conta está confirmada. Entre no painel.',
+          cta: 'Entrar no painel', ctaHref: '/admin',
+        });
+      } catch (ex) {
+        msg({
+          icon: 'warn',
+          title: 'Não foi possível confirmar',
+          text: (ex as Error).message || 'O link pode ter expirado. Peça um novo.',
+          cta: 'Ir para o painel', ctaHref: '/admin',
+        });
+      }
+      return;
+    }
+
+    msg({
+      icon: 'info',
+      title: 'Acesso ao painel',
+      text: 'Abra esta página pelo link que você recebeu por e-mail (convite ou recuperação de senha). Para entrar no painel direto, use o botão abaixo.',
+      cta: 'Ir para o painel', ctaHref: '/admin',
+    });
+  }
+
+  boot();
+</script>
