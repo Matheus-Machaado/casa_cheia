@@ -12,7 +12,7 @@ const settings = await getRuntimeSettings();
 Astro.response.headers.set('Cache-Control', 'public, max-age=0, s-maxage=30, stale-while-revalidate=120');
 ---
 
-<Base title={`Presentes — chá da ${settings.bride_name}`} description="Lista de presentes do chá de casa nova da Lina">
+<Base title={`Presentes | chá da ${settings.bride_name}`} description="Lista de presentes do chá de casa nova da Lina">
   <Catalog client:load products={products} rooms={settings.rooms} />
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js" defer></script>
 </Base>
