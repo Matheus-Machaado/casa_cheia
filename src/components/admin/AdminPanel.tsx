@@ -206,6 +206,20 @@ export default function AdminPanel(props: Props) {
         <AdminSettings />
       </Show>
 
+      <footer class="mt-12 border-t border-line-2 bg-white py-5">
+        <p class="text-center text-[11px] text-ink-3">
+          Desenvolvido por{' '}
+          <a
+            href="https://matheus-machado-dev.com.br/"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="underline underline-offset-2 decoration-ink-3/40 transition-colors hover:text-primary-h hover:decoration-primary-h"
+          >
+            Matheus Machado
+          </a>
+        </p>
+      </footer>
+
       <DialogHost />
     </div>
   );

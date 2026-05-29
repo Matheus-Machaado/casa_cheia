@@ -48,6 +48,10 @@ const products = await getRuntimeProducts();
 
           <button class="login-forgot" id="logForgot" type="button">Esqueci minha senha</button>
           <a href="/" class="login-back">← Voltar pro site</a>
+          <p class="login-author">
+            Desenvolvido por
+            <a href="https://matheus-machado-dev.com.br/" target="_blank" rel="noopener noreferrer">Matheus Machado</a>
+          </p>
         </div>
       </section>
 
@@ -228,6 +232,25 @@ const products = await getRuntimeProducts();
     transition: color 0.15s;
   }
   .login-back:hover { color: #09090B; }
+
+  .login-author {
+    margin: 14px 0 0;
+    text-align: center;
+    font-size: 11px;
+    color: #A1A1AA;
+  }
+  .login-author a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    text-decoration-color: rgba(161, 161, 170, 0.5);
+    transition: color 0.18s ease, text-decoration-color 0.18s ease;
+  }
+  .login-author a:hover,
+  .login-author a:focus-visible {
+    color: #F43F5E;
+    text-decoration-color: currentColor;
+  }
 
   .login-hero {
     position: relative;
